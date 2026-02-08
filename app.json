@@ -23,8 +23,6 @@
       [
         "expo-splash-screen",
         {
-          "imageWidth": 200,
-          "resizeMode": "contain",
           "backgroundColor": "#FFB800",
           "dark": {
             "backgroundColor": "#8B6914"
