@@ -21,7 +21,7 @@ create table locations (
 
 alter table locations enable row level security;
 create policy "Users manage own locations"
-  on locations for all using (auth.uid() = user_id);
+  on locations for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 2. hive_rows
@@ -38,7 +38,7 @@ create table hive_rows (
 
 alter table hive_rows enable row level security;
 create policy "Users manage own hive_rows"
-  on hive_rows for all using (auth.uid() = user_id);
+  on hive_rows for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 3. hives
@@ -65,7 +65,7 @@ create table hives (
 
 alter table hives enable row level security;
 create policy "Users manage own hives"
-  on hives for all using (auth.uid() = user_id);
+  on hives for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 4. hive_notes
@@ -81,7 +81,7 @@ create table hive_notes (
 
 alter table hive_notes enable row level security;
 create policy "Users manage own hive_notes"
-  on hive_notes for all using (auth.uid() = user_id);
+  on hive_notes for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 5. hive_feeding_dates
@@ -96,7 +96,7 @@ create table hive_feeding_dates (
 
 alter table hive_feeding_dates enable row level security;
 create policy "Users manage own hive_feeding_dates"
-  on hive_feeding_dates for all using (auth.uid() = user_id);
+  on hive_feeding_dates for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 6. hive_harvest_dates
@@ -111,7 +111,7 @@ create table hive_harvest_dates (
 
 alter table hive_harvest_dates enable row level security;
 create policy "Users manage own hive_harvest_dates"
-  on hive_harvest_dates for all using (auth.uid() = user_id);
+  on hive_harvest_dates for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 7. queens
@@ -136,7 +136,7 @@ create table queens (
 
 alter table queens enable row level security;
 create policy "Users manage own queens"
-  on queens for all using (auth.uid() = user_id);
+  on queens for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 8. queen_box_rows
@@ -153,7 +153,7 @@ create table queen_box_rows (
 
 alter table queen_box_rows enable row level security;
 create policy "Users manage own queen_box_rows"
-  on queen_box_rows for all using (auth.uid() = user_id);
+  on queen_box_rows for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 9. queen_boxes
@@ -175,7 +175,7 @@ create table queen_boxes (
 
 alter table queen_boxes enable row level security;
 create policy "Users manage own queen_boxes"
-  on queen_boxes for all using (auth.uid() = user_id);
+  on queen_boxes for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 10. nuclei
@@ -198,7 +198,7 @@ create table nuclei (
 
 alter table nuclei enable row level security;
 create policy "Users manage own nuclei"
-  on nuclei for all using (auth.uid() = user_id);
+  on nuclei for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 11. sales
@@ -220,7 +220,7 @@ create table sales (
 
 alter table sales enable row level security;
 create policy "Users manage own sales"
-  on sales for all using (auth.uid() = user_id);
+  on sales for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 12. sale_items
@@ -240,7 +240,7 @@ create table sale_items (
 
 alter table sale_items enable row level security;
 create policy "Users manage own sale_items"
-  on sale_items for all using (auth.uid() = user_id);
+  on sale_items for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 13. expenses
@@ -259,7 +259,7 @@ create table expenses (
 
 alter table expenses enable row level security;
 create policy "Users manage own expenses"
-  on expenses for all using (auth.uid() = user_id);
+  on expenses for all to authenticated using (true) with check (true);
 
 -- ============================================
 -- 14. incomes
@@ -278,4 +278,4 @@ create table incomes (
 
 alter table incomes enable row level security;
 create policy "Users manage own incomes"
-  on incomes for all using (auth.uid() = user_id);
+  on incomes for all to authenticated using (true) with check (true);

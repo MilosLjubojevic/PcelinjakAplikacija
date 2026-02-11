@@ -9,13 +9,17 @@ export default function GoogleAuthCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      console.log("[GOOGLE-AUTH] handleCallback, code=", params.code ? "present" : "missing");
       if (params.code) {
         try {
+          console.log("[GOOGLE-AUTH] exchanging code for session...");
           await supabase.auth.exchangeCodeForSession(params.code);
-        } catch (error) {
-          console.error("Error exchanging code:", error);
+          console.log("[GOOGLE-AUTH] exchange success");
+        } catch (e: any) {
+          console.log("[GOOGLE-AUTH] exchange failed:", e?.message || e);
         }
       }
+      console.log("[GOOGLE-AUTH] redirecting to /");
       router.replace("/");
     };
 

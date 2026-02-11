@@ -28,10 +28,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log("[AUTH] Initializing auth...");
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log("[AUTH] getSession result:", session ? `user=${session.user.email}` : "no session");
       if (session) {
         const isAllowed = await checkAllowedEmail(session.user.email);
+        console.log("[AUTH] getSession email check:", session.user.email, "allowed=", isAllowed);
         if (!isAllowed) {
+          console.log("[AUTH] getSession - email not allowed, signing out");
           await supabase.auth.signOut();
           setSession(null);
           setLoading(false);
@@ -45,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("[AUTH] onAuthStateChange event=", _event, "session=", session ? `user=${session.user.email}` : "null");
       setSession(session);
     });
 
@@ -54,7 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkAllowedEmail = async (
     email: string | undefined,
   ): Promise<boolean> => {
-    if (!email) return false;
+    console.log("[AUTH] checkAllowedEmail called with:", email);
+    if (!email) {
+      console.log("[AUTH] checkAllowedEmail - no email provided");
+      return false;
+    }
 
     const { data, error } = await supabase
       .from("allowed_emails")
@@ -62,23 +71,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("email", email)
       .single();
 
+    console.log("[AUTH] checkAllowedEmail result:", { email, data, error: error?.message || null });
     return !error && !!data;
   };
 
   const createSessionFromUrl = async (url: string) => {
+    console.log("[AUTH] createSessionFromUrl called with:", url);
     const params = QueryParams.getQueryParams(url);
+    console.log("[AUTH] parsed params:", JSON.stringify(params.params));
 
     let newSession: Session | null = null;
 
     if (params.params.code) {
+      console.log("[AUTH] exchanging code for session...");
       const { data, error } = await supabase.auth.exchangeCodeForSession(
         params.params.code,
       );
-      if (error) throw error;
-      newSession = data.session;
+      if (error) {
+        console.log("[AUTH] exchangeCodeForSession error:", error.message);
+        // Code may already be exchanged by google-auth.tsx deep link handler.
+        // Check if a session was established there instead.
+        console.log("[AUTH] checking for existing session (fallback)...");
+        const {
+          data: { session: existingSession },
+        } = await supabase.auth.getSession();
+        console.log("[AUTH] fallback getSession:", existingSession ? `user=${existingSession.user.email}` : "no session");
+        if (existingSession) {
+          newSession = existingSession;
+        } else {
+          throw error;
+        }
+      } else {
+        console.log("[AUTH] exchangeCodeForSession success, user=", data.session?.user.email);
+        newSession = data.session;
+      }
+    } else if (params.params.error) {
+      console.log("[AUTH] OAuth error:", params.params.error, params.params.error_description);
+      throw new Error(params.params.error_description || params.params.error);
     } else {
       const access_token = params.params.access_token;
       const refresh_token = params.params.refresh_token;
+      console.log("[AUTH] no code param, access_token=", !!access_token, "refresh_token=", !!refresh_token);
 
       if (access_token && refresh_token) {
         const { data, error } = await supabase.auth.setSession({
@@ -91,12 +124,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (newSession) {
+      console.log("[AUTH] got session for:", newSession.user.email, "- checking allowed email...");
       const isAllowed = await checkAllowedEmail(newSession.user.email);
+      console.log("[AUTH] email allowed=", isAllowed);
       if (!isAllowed) {
+        console.log("[AUTH] email NOT allowed, signing out");
         await supabase.auth.signOut();
         throw new Error("Nemate dozvolu za pristup ovoj aplikaciji.");
       }
+      console.log("[AUTH] login complete, setting session");
       setSession(newSession);
+    } else {
+      console.log("[AUTH] createSessionFromUrl - no session established");
     }
   };
 
@@ -104,6 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const redirectUri = makeRedirectUri({
       path: "google-auth",
     });
+    console.log("[AUTH] signInWithGoogle - redirectUri=", redirectUri);
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -113,12 +153,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      console.log("[AUTH] signInWithOAuth error:", error.message);
+      throw error;
+    }
+    console.log("[AUTH] signInWithOAuth success, opening browser...");
 
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+    console.log("[AUTH] browser result:", result.type);
 
     if (result.type === "success" && result.url) {
+      console.log("[AUTH] browser returned URL:", result.url);
       await createSessionFromUrl(result.url);
+    } else {
+      console.log("[AUTH] browser dismissed or failed, type=", result.type);
     }
   };
 

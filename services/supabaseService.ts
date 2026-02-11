@@ -29,12 +29,12 @@ import {
 
 export async function fetchAllLocations(userId: string): Promise<Location[]> {
   const [locsRes, rowsRes, hivesRes, notesRes, feedRes, harvestRes] = await Promise.all([
-    supabase.from('locations').select('*').eq('user_id', userId).order('created_at'),
-    supabase.from('hive_rows').select('*').eq('user_id', userId).order('order'),
-    supabase.from('hives').select('*').eq('user_id', userId),
-    supabase.from('hive_notes').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-    supabase.from('hive_feeding_dates').select('*').eq('user_id', userId).order('date'),
-    supabase.from('hive_harvest_dates').select('*').eq('user_id', userId).order('date'),
+    supabase.from('locations').select('*').order('created_at'),
+    supabase.from('hive_rows').select('*').order('order'),
+    supabase.from('hives').select('*'),
+    supabase.from('hive_notes').select('*').order('created_at', { ascending: false }),
+    supabase.from('hive_feeding_dates').select('*').order('date'),
+    supabase.from('hive_harvest_dates').select('*').order('date'),
   ]);
 
   if (locsRes.error) throw locsRes.error;
@@ -106,8 +106,7 @@ export async function updateLocationScalars(userId: string, id: string, updates:
     const { error } = await supabase
       .from('locations')
       .update(dbUpdates)
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -122,8 +121,7 @@ export async function deleteLocation(userId: string, id: string): Promise<boolea
     const { error } = await supabase
       .from('locations')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -284,8 +282,7 @@ async function syncHiveDates(
   const { error: delErr } = await supabase
     .from(table)
     .delete()
-    .eq('hive_id', hiveId)
-    .eq('user_id', userId);
+    .eq('hive_id', hiveId);
   if (delErr) throw delErr;
 
   if (dates.length > 0) {
@@ -363,7 +360,6 @@ export async function fetchAllQueens(userId: string): Promise<Queen[]> {
   const { data, error } = await supabase
     .from('queens')
     .select('*')
-    .eq('user_id', userId)
     .order('created_at');
   if (error) throw error;
   return (data || []).map(dbToQueen);
@@ -400,8 +396,7 @@ export async function updateQueen(userId: string, id: string, updates: Partial<Q
     const { error } = await supabase
       .from('queens')
       .update(dbUpdates)
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -415,8 +410,7 @@ export async function deleteQueen(userId: string, id: string): Promise<boolean> 
     const { error } = await supabase
       .from('queens')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -431,8 +425,8 @@ export async function deleteQueen(userId: string, id: string): Promise<boolean> 
 
 export async function fetchAllQueenBoxRows(userId: string): Promise<QueenBoxRow[]> {
   const [rowsRes, boxesRes] = await Promise.all([
-    supabase.from('queen_box_rows').select('*').eq('user_id', userId).order('order'),
-    supabase.from('queen_boxes').select('*').eq('user_id', userId),
+    supabase.from('queen_box_rows').select('*').order('order'),
+    supabase.from('queen_boxes').select('*'),
   ]);
   if (rowsRes.error) throw rowsRes.error;
 
@@ -474,8 +468,7 @@ export async function updateQueenBoxRowScalars(userId: string, id: string, updat
     const { error } = await supabase
       .from('queen_box_rows')
       .update(dbUpdates)
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -535,8 +528,7 @@ export async function deleteQueenBoxRow(userId: string, id: string): Promise<boo
     const { error } = await supabase
       .from('queen_box_rows')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -553,7 +545,6 @@ export async function fetchAllNuclei(userId: string): Promise<Nuclei[]> {
   const { data, error } = await supabase
     .from('nuclei')
     .select('*')
-    .eq('user_id', userId)
     .order('created_at');
   if (error) throw error;
   return (data || []).map(dbToNuclei);
@@ -588,8 +579,7 @@ export async function updateNucleus(userId: string, id: string, updates: Partial
     const { error } = await supabase
       .from('nuclei')
       .update(dbUpdates)
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -603,8 +593,7 @@ export async function deleteNucleus(userId: string, id: string): Promise<boolean
     const { error } = await supabase
       .from('nuclei')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -619,8 +608,8 @@ export async function deleteNucleus(userId: string, id: string): Promise<boolean
 
 export async function fetchAllSales(userId: string): Promise<Sale[]> {
   const [salesRes, itemsRes] = await Promise.all([
-    supabase.from('sales').select('*').eq('user_id', userId).order('sale_date', { ascending: false }),
-    supabase.from('sale_items').select('*').eq('user_id', userId),
+    supabase.from('sales').select('*').order('sale_date', { ascending: false }),
+    supabase.from('sale_items').select('*'),
   ]);
   if (salesRes.error) throw salesRes.error;
 
@@ -674,8 +663,7 @@ export async function updateSale(userId: string, id: string, updates: Partial<Sa
     const { error } = await supabase
       .from('sales')
       .update(dbUpdates)
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -690,8 +678,7 @@ export async function deleteSale(userId: string, id: string): Promise<boolean> {
     const { error } = await supabase
       .from('sales')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -708,7 +695,6 @@ export async function fetchAllExpenses(userId: string): Promise<Expense[]> {
   const { data, error } = await supabase
     .from('expenses')
     .select('*')
-    .eq('user_id', userId)
     .order('date', { ascending: false });
   if (error) throw error;
   return (data || []).map(dbToExpense);
@@ -739,8 +725,7 @@ export async function updateExpense(userId: string, id: string, updates: Partial
     const { error } = await supabase
       .from('expenses')
       .update(dbUpdates)
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -754,8 +739,7 @@ export async function deleteExpense(userId: string, id: string): Promise<boolean
     const { error } = await supabase
       .from('expenses')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -772,7 +756,6 @@ export async function fetchAllIncomes(userId: string): Promise<Income[]> {
   const { data, error } = await supabase
     .from('incomes')
     .select('*')
-    .eq('user_id', userId)
     .order('date', { ascending: false });
   if (error) throw error;
   return (data || []).map(dbToIncome);
@@ -803,8 +786,7 @@ export async function updateIncome(userId: string, id: string, updates: Partial<
     const { error } = await supabase
       .from('incomes')
       .update(dbUpdates)
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -818,8 +800,7 @@ export async function deleteIncome(userId: string, id: string): Promise<boolean>
     const { error } = await supabase
       .from('incomes')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
     if (error) throw error;
     return true;
   } catch (error) {
@@ -835,14 +816,15 @@ export async function deleteIncome(userId: string, id: string): Promise<boolean>
 export async function deleteAllUserData(userId: string): Promise<boolean> {
   try {
     // Delete from parent tables — CASCADE handles children
+    // Note: deletes ALL shared data, not just the caller's
     await Promise.all([
-      supabase.from('locations').delete().eq('user_id', userId),
-      supabase.from('queens').delete().eq('user_id', userId),
-      supabase.from('queen_box_rows').delete().eq('user_id', userId),
-      supabase.from('nuclei').delete().eq('user_id', userId),
-      supabase.from('sales').delete().eq('user_id', userId),
-      supabase.from('expenses').delete().eq('user_id', userId),
-      supabase.from('incomes').delete().eq('user_id', userId),
+      supabase.from('locations').delete().neq('id', ''),
+      supabase.from('queens').delete().neq('id', ''),
+      supabase.from('queen_box_rows').delete().neq('id', ''),
+      supabase.from('nuclei').delete().neq('id', ''),
+      supabase.from('sales').delete().neq('id', ''),
+      supabase.from('expenses').delete().neq('id', ''),
+      supabase.from('incomes').delete().neq('id', ''),
     ]);
     return true;
   } catch (error) {
