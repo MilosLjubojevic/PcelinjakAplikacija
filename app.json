@@ -4,6 +4,7 @@
     "slug": "PcelinjakAplikacija",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "scheme": "pcelinjakaplikacija",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,6 +14,10 @@
     "android": {
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#FFB800"
+      },
       "package": "com.anonymous.PcelinjakAplikacija"
     },
     "web": {
@@ -24,7 +29,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "imageWidth": 1,
+          "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#FFB800",
           "dark": {
@@ -43,6 +48,12 @@
       "eas": {
         "projectId": "5d30d36a-e266-45e1-8e8b-2cf21676c0c7"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/5d30d36a-e266-45e1-8e8b-2cf21676c0c7"
     }
   }
 }
