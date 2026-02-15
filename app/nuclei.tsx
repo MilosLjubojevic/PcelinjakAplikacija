@@ -33,6 +33,7 @@ export default function NucleiScreen() {
   const { state, loading, addNuclei, updateNuclei, deleteNuclei } = useApp();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingNuclei, setEditingNuclei] = useState<Nuclei | null>(null);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     status: "developing" as NucleiStatus,
@@ -88,6 +89,7 @@ export default function NucleiScreen() {
       Alert.alert('Greška', 'Snaga mora biti između 1 i 10');
       return;
     }
+    setSaving(true);
     const nucleiData = {
       name: formData.name,
       status: formData.status,
@@ -112,6 +114,7 @@ export default function NucleiScreen() {
       await addNuclei(newNuclei);
     }
 
+    setSaving(false);
     setModalVisible(false);
     resetForm();
   };
@@ -167,6 +170,7 @@ export default function NucleiScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Učitavanje...</Text>
       </View>
     );
   }
@@ -357,6 +361,7 @@ export default function NucleiScreen() {
           <Button
             title={editingNuclei ? "Sacuvaj" : "Dodaj"}
             onPress={handleSave}
+            loading={saving}
             style={{ flex: 1, marginLeft: SPACING.sm }}
           />
         </View>
@@ -375,6 +380,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: SPACING.md,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
   },
   scrollView: {
     flex: 1,

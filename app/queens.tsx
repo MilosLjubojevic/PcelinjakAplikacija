@@ -51,6 +51,7 @@ export default function QueensScreen() {
     endNumber: "",
     location: "kuca" as QueenBoxLocation,
   });
+  const [saving, setSaving] = useState(false);
   const [boxFormData, setBoxFormData] = useState({
     health: "good" as QueenBoxHealth,
     status: "empty" as QueenBoxStatus,
@@ -113,6 +114,7 @@ export default function QueensScreen() {
       Alert.alert("Greska", "Unesite validne brojeve (pocetni mora biti manji od krajnjeg).");
       return;
     }
+    setSaving(true);
 
     const now = new Date();
     const newRowId = Crypto.randomUUID();
@@ -143,6 +145,7 @@ export default function QueensScreen() {
     };
 
     await addQueenBoxRow(newRow);
+    setSaving(false);
     setExpandedRows([newRowId]);
     setAddRowModalVisible(false);
     resetForm();
@@ -153,6 +156,7 @@ export default function QueensScreen() {
 
     const row = queenBoxRows.find((r) => r.id === editingRowId);
     if (!row) return;
+    setSaving(true);
 
     const startDate = boxFormData.startDate || undefined;
     const newNumber = parseInt(boxFormData.displayNumber);
@@ -184,6 +188,7 @@ export default function QueensScreen() {
     );
 
     await updateQueenBoxRow(editingRowId, { queenBoxes: updatedBoxes });
+    setSaving(false);
     setEditBoxModalVisible(false);
     resetBoxForm();
   };
@@ -352,6 +357,7 @@ export default function QueensScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Učitavanje...</Text>
       </View>
     );
   }
@@ -671,6 +677,7 @@ export default function QueensScreen() {
             title="Dodaj Red"
             onPress={handleAddRow}
             disabled={!formData.rowName || !formData.startNumber || !formData.endNumber}
+            loading={saving}
             style={{ flex: 1, marginLeft: SPACING.sm }}
           />
         </View>
@@ -770,6 +777,7 @@ export default function QueensScreen() {
           <Button
             title="Sacuvaj"
             onPress={handleSaveBox}
+            loading={saving}
             style={{ flex: 1, marginLeft: SPACING.sm }}
           />
         </View>
@@ -788,6 +796,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: SPACING.md,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
   },
   locationSelector: {
     flexDirection: "row",

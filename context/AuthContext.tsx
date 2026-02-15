@@ -44,12 +44,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setSession(session);
       setLoading(false);
+    }).catch(async (error) => {
+      console.log("[AUTH] getSession error:", error.message);
+      // Invalid refresh token — clear stale session and show login
+      await supabase.auth.signOut().catch(() => {});
+      setSession(null);
+      setLoading(false);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log("[AUTH] onAuthStateChange event=", _event, "session=", session ? `user=${session.user.email}` : "null");
+      if (_event === "TOKEN_REFRESHED" && !session) {
+        // Refresh failed — clear session
+        setSession(null);
+        return;
+      }
       setSession(session);
     });
 

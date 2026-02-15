@@ -91,6 +91,7 @@ export default function AdminScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Učitavanje...</Text>
       </View>
     );
   }
@@ -202,6 +203,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: COLORS.background,
     padding: SPACING.xxxl,
+  },
+  loadingText: {
+    marginTop: SPACING.md,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
   },
   errorText: {
     fontSize: FONT_SIZE.md,

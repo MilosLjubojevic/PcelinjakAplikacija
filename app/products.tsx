@@ -51,6 +51,7 @@ export default function ProductsScreen() {
   const [editingPriceOption, setEditingPriceOption] = useState<ProductPriceOption | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     product_name: "",
@@ -160,21 +161,25 @@ export default function ProductsScreen() {
       Alert.alert("Greska", "Naziv proizvoda je obavezan");
       return;
     }
+    setSaving(true);
 
     if (editingProduct) {
       const success = await updateProduct(editingProduct.id, formData);
       if (!success) {
+        setSaving(false);
         Alert.alert("Greska", "Nije moguce azurirati proizvod");
         return;
       }
     } else {
       const newProduct = await addProduct(formData);
       if (!newProduct) {
+        setSaving(false);
         Alert.alert("Greska", "Nije moguce dodati proizvod");
         return;
       }
     }
 
+    setSaving(false);
     setModalVisible(false);
     resetForm();
   };
@@ -206,6 +211,7 @@ export default function ProductsScreen() {
       Alert.alert("Greska", "Velicina i cena su obavezni");
       return;
     }
+    setSaving(true);
 
     const optionData = {
       product_id: selectedProductId,
@@ -217,17 +223,20 @@ export default function ProductsScreen() {
     if (editingPriceOption) {
       const success = await updatePriceOption(editingPriceOption.id, optionData);
       if (!success) {
+        setSaving(false);
         Alert.alert("Greska", "Nije moguce azurirati opciju cene");
         return;
       }
     } else {
       const newOption = await addPriceOption(optionData);
       if (!newOption) {
+        setSaving(false);
         Alert.alert("Greska", "Nije moguce dodati opciju cene");
         return;
       }
     }
 
+    setSaving(false);
     setPriceModalVisible(false);
     resetPriceForm();
   };
@@ -273,6 +282,7 @@ export default function ProductsScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Učitavanje...</Text>
       </View>
     );
   }
@@ -522,6 +532,7 @@ export default function ProductsScreen() {
             onPress={handleSaveProduct}
             style={{ flex: 1, marginLeft: SPACING.sm }}
             disabled={imageUploading}
+            loading={saving}
           />
         </View>
       </Modal>
@@ -571,6 +582,7 @@ export default function ProductsScreen() {
           <Button
             title={editingPriceOption ? "Sacuvaj" : "Dodaj"}
             onPress={handleSavePriceOption}
+            loading={saving}
             style={{ flex: 1, marginLeft: SPACING.sm }}
           />
         </View>
@@ -589,6 +601,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: SPACING.md,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
   },
   errorContainer: {
     flex: 1,

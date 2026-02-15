@@ -37,6 +37,7 @@ export default function HivesScreen() {
   const [addRowModalVisible, setAddRowModalVisible] = useState(false);
   const [editHiveModalVisible, setEditHiveModalVisible] = useState(false);
   const [editingHive, setEditingHive] = useState<Hive | null>(null);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     rowName: "",
     hiveCount: "",
@@ -175,6 +176,7 @@ export default function HivesScreen() {
 
   const handleSaveHive = async () => {
     if (!editingHive || !currentLocation) return;
+    setSaving(true);
 
     const updatedHive: Hive = {
       ...editingHive,
@@ -210,6 +212,7 @@ export default function HivesScreen() {
       rows: updatedRows,
     });
 
+    setSaving(false);
     setEditHiveModalVisible(false);
     resetHiveForm();
   };
@@ -223,6 +226,7 @@ export default function HivesScreen() {
     if (isNaN(hiveCount) || hiveCount <= 0) {
       return;
     }
+    setSaving(true);
 
     const now = new Date();
     const newRowId = Crypto.randomUUID();
@@ -257,6 +261,7 @@ export default function HivesScreen() {
       rows: updatedRows,
     });
 
+    setSaving(false);
     setExpandedRows([newRowId]);
     setAddRowModalVisible(false);
     resetForm();
@@ -387,6 +392,7 @@ export default function HivesScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Učitavanje...</Text>
       </View>
     );
   }
@@ -624,6 +630,7 @@ export default function HivesScreen() {
             title="Dodaj Red"
             onPress={handleAddRow}
             disabled={!formData.rowName || !formData.hiveCount}
+            loading={saving}
             style={{ flex: 1, marginLeft: SPACING.sm }}
           />
         </View>
@@ -967,6 +974,7 @@ export default function HivesScreen() {
           <Button
             title="Sačuvaj"
             onPress={handleSaveHive}
+            loading={saving}
             style={{ flex: 1, marginLeft: SPACING.sm }}
           />
         </View>
@@ -985,6 +993,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: SPACING.md,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
   },
   locationSelector: {
     flexDirection: "row",

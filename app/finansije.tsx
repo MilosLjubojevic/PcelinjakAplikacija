@@ -73,6 +73,7 @@ export default function FinansijeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     category: "equipment" as ExpenseCategory | IncomeCategory,
     description: "",
@@ -149,6 +150,7 @@ export default function FinansijeScreen() {
 
   const handleSave = async () => {
     if (!formData.description || !formData.amount) return;
+    setSaving(true);
 
     const now = new Date();
 
@@ -194,6 +196,7 @@ export default function FinansijeScreen() {
       }
     }
 
+    setSaving(false);
     setModalVisible(false);
     resetForm();
   };
@@ -252,6 +255,7 @@ export default function FinansijeScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Učitavanje...</Text>
       </View>
     );
   }
@@ -642,6 +646,7 @@ export default function FinansijeScreen() {
             title={editingExpense || editingIncome ? "Sačuvaj" : "Dodaj"}
             onPress={handleSave}
             disabled={!formData.description || !formData.amount}
+            loading={saving}
             style={{ flex: 1 }}
           />
         </View>
@@ -660,6 +665,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: SPACING.md,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
   },
   summaryContainer: {
     flexDirection: "row",

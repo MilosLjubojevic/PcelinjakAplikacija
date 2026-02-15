@@ -36,6 +36,7 @@ export default function OrdersScreen() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [togglingOrderId, setTogglingOrderId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -64,6 +65,7 @@ export default function OrdersScreen() {
   };
 
   const handleToggleStatus = async (order: OrderWithItems) => {
+    setTogglingOrderId(order.id);
     const newStatus = !order.sent;
     const success = await updateOrderStatus(order.id, newStatus);
 
@@ -75,6 +77,7 @@ export default function OrdersScreen() {
     if (selectedOrder && selectedOrder.id === order.id) {
       setSelectedOrder({ ...selectedOrder, sent: newStatus });
     }
+    setTogglingOrderId(null);
   };
 
   const handleDeleteOrder = (order: OrderWithItems) => {
@@ -123,6 +126,7 @@ export default function OrdersScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Učitavanje...</Text>
       </View>
     );
   }
@@ -302,24 +306,31 @@ export default function OrdersScreen() {
                           backgroundColor: order.sent ? COLORS.borderMedium : COLORS.success,
                         },
                       ]}
+                      disabled={togglingOrderId === order.id}
                       onPress={(e) => {
                         e.stopPropagation();
                         handleToggleStatus(order);
                       }}
                     >
-                      <Ionicons
-                        name={order.sent ? "close" : "checkmark"}
-                        size={16}
-                        color={order.sent ? COLORS.textSecondary : COLORS.surface}
-                      />
-                      <Text
-                        style={[
-                          styles.quickStatusText,
-                          { color: order.sent ? COLORS.textSecondary : COLORS.surface },
-                        ]}
-                      >
-                        {order.sent ? "Ponisti" : "Oznaci poslato"}
-                      </Text>
+                      {togglingOrderId === order.id ? (
+                        <ActivityIndicator size="small" color={order.sent ? COLORS.textSecondary : COLORS.surface} />
+                      ) : (
+                        <>
+                          <Ionicons
+                            name={order.sent ? "close" : "checkmark"}
+                            size={16}
+                            color={order.sent ? COLORS.textSecondary : COLORS.surface}
+                          />
+                          <Text
+                            style={[
+                              styles.quickStatusText,
+                              { color: order.sent ? COLORS.textSecondary : COLORS.surface },
+                            ]}
+                          >
+                            {order.sent ? "Ponisti" : "Oznaci poslato"}
+                          </Text>
+                        </>
+                      )}
                     </TouchableOpacity>
                   </View>
                 </Card>
@@ -457,6 +468,7 @@ export default function OrdersScreen() {
               <Button
                 title={selectedOrder.sent ? "Oznaci kao neposlato" : "Oznaci kao poslato"}
                 onPress={() => handleToggleStatus(selectedOrder)}
+                loading={togglingOrderId === selectedOrder.id}
                 style={{ marginBottom: SPACING.md }}
               />
               <Button
@@ -483,6 +495,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: SPACING.md,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
   },
   errorContainer: {
     flex: 1,
