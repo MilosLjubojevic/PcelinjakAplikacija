@@ -70,7 +70,7 @@ export default function OrdersScreen() {
     const success = await updateOrderStatus(order.id, newStatus);
 
     if (!success) {
-      Alert.alert("Greska", "Nije moguce azurirati status porudzbine");
+      Alert.alert("Greška", "Nije moguće ažurirati status porudžbine");
     }
 
     // Update selected order if it's open
@@ -82,17 +82,17 @@ export default function OrdersScreen() {
 
   const handleDeleteOrder = (order: OrderWithItems) => {
     Alert.alert(
-      "Obrisi Porudzbinu",
-      `Da li ste sigurni da zelite da obrisete porudzbinu od "${order.name} ${order.lastname}"?`,
+      "Obriši Porudžbinu",
+      `Da li ste sigurni da želite da obrišete porudžbinu od "${order.name} ${order.lastname}"?`,
       [
-        { text: "Otkazi", style: "cancel" },
+        { text: "Otkaži", style: "cancel" },
         {
-          text: "Obrisi",
+          text: "Obriši",
           style: "destructive",
           onPress: async () => {
             const success = await deleteOrder(order.id);
             if (!success) {
-              Alert.alert("Greska", "Nije moguce obrisati porudzbinu");
+              Alert.alert("Greška", "Nije moguće obrisati porudžbinu");
             } else {
               setDetailModalVisible(false);
               setSelectedOrder(null);
@@ -137,7 +137,7 @@ export default function OrdersScreen() {
         <Ionicons name="settings-outline" size={64} color={COLORS.primary} />
         <Text style={styles.configTitle}>Supabase nije konfigurisan</Text>
         <Text style={styles.configText}>
-          Otvorite utils/supabase.ts i dodajte vase Supabase kredencijale:{"\n\n"}
+          Otvorite utils/supabase.ts i dodajte vaše Supabase kredencijale:{"\n\n"}
           - SUPABASE_URL{"\n"}
           - SUPABASE_ANON_KEY
         </Text>
@@ -150,7 +150,7 @@ export default function OrdersScreen() {
       <View style={styles.errorContainer}>
         <Ionicons name="alert-circle" size={64} color={COLORS.danger} />
         <Text style={styles.errorText}>{ordersError}</Text>
-        <Button title="Pokusaj ponovo" onPress={fetchOrders} />
+        <Button title="Pokušaj ponovo" onPress={fetchOrders} />
       </View>
     );
   }
@@ -161,7 +161,7 @@ export default function OrdersScreen() {
       <Card style={styles.summaryCard}>
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Na cekanju</Text>
+            <Text style={styles.summaryLabel}>Na čekanju</Text>
             <Text style={[styles.summaryValue, { color: COLORS.primary }]}>
               {pendingCount}
             </Text>
@@ -192,6 +192,9 @@ export default function OrdersScreen() {
               styles.filterTabText,
               filter === "all" && styles.filterTabTextActive,
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             Sve ({orders.length})
           </Text>
@@ -208,8 +211,11 @@ export default function OrdersScreen() {
               styles.filterTabText,
               filter === "pending" && styles.filterTabTextActive,
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
-            Na cekanju ({pendingCount})
+            Na čekanju ({pendingCount})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -221,6 +227,9 @@ export default function OrdersScreen() {
               styles.filterTabText,
               filter === "sent" && styles.filterTabTextActive,
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             Poslato ({sentCount})
           </Text>
@@ -237,13 +246,13 @@ export default function OrdersScreen() {
         {filteredOrders.length === 0 ? (
           <EmptyState
             icon="receipt-outline"
-            title="Nema porudzbina"
+            title="Nema porudžbina"
             message={
               filter === "all"
-                ? "Porudzbine ce se pojaviti ovde kada kupci naruci"
+                ? "Porudžbine će se pojaviti ovdje kada kupci naruče"
                 : filter === "pending"
-                ? "Nema porudzbina na cekanju"
-                : "Nema poslatih porudzbina"
+                ? "Nema porudžbina na čekanju"
+                : "Nema poslatih porudžbina"
             }
           />
         ) : (
@@ -268,7 +277,7 @@ export default function OrdersScreen() {
                         ]}
                       >
                         <Text style={styles.statusText}>
-                          {order.sent ? "Poslato" : "Na cekanju"}
+                          {order.sent ? "Poslato" : "Na čekanju"}
                         </Text>
                       </View>
                     </View>
@@ -327,7 +336,7 @@ export default function OrdersScreen() {
                               { color: order.sent ? COLORS.textSecondary : COLORS.surface },
                             ]}
                           >
-                            {order.sent ? "Ponisti" : "Oznaci poslato"}
+                            {order.sent ? "Poništi" : "Označi poslato"}
                           </Text>
                         </>
                       )}
@@ -352,7 +361,7 @@ export default function OrdersScreen() {
           setDetailModalVisible(false);
           setSelectedOrder(null);
         }}
-        title="Detalji Porudzbine"
+        title="Detalji Porudžbine"
       >
         {selectedOrder && (
           <>
@@ -406,7 +415,7 @@ export default function OrdersScreen() {
                 <View key={item.id || index} style={styles.orderItem}>
                   <View style={styles.orderItemInfo}>
                     <Text style={styles.orderItemName}>
-                      {item.product?.product_name || "Nepoznat proizvod"}
+                      {item.product?.product_name || "Nepoznati proizvod"}
                     </Text>
                     <Text style={styles.orderItemOption}>
                       {item.price_option?.size || "N/A"} x {item.quantity}
@@ -457,7 +466,7 @@ export default function OrdersScreen() {
                     color={COLORS.surface}
                   />
                   <Text style={styles.statusTextLarge}>
-                    {selectedOrder.sent ? "Poslato" : "Na cekanju"}
+                    {selectedOrder.sent ? "Poslato" : "Na čekanju"}
                   </Text>
                 </View>
               </View>
@@ -466,13 +475,13 @@ export default function OrdersScreen() {
             {/* Actions */}
             <View style={styles.modalActions}>
               <Button
-                title={selectedOrder.sent ? "Oznaci kao neposlato" : "Oznaci kao poslato"}
+                title={selectedOrder.sent ? "Označi kao neposlato" : "Označi kao poslato"}
                 onPress={() => handleToggleStatus(selectedOrder)}
                 loading={togglingOrderId === selectedOrder.id}
                 style={{ marginBottom: SPACING.md }}
               />
               <Button
-                title="Obrisi porudzbinu"
+                title="Obriši porudžbinu"
                 onPress={() => handleDeleteOrder(selectedOrder)}
                 variant="secondary"
                 style={{ backgroundColor: COLORS.dangerLight }}
@@ -569,6 +578,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     fontWeight: "600",
     color: COLORS.textSecondary,
+    textAlign: "center",
   },
   filterTabTextActive: {
     color: COLORS.surface,
@@ -608,7 +618,7 @@ const styles = StyleSheet.create({
     color: COLORS.surface,
   },
   orderDetails: {
-    gap: 6,
+    gap: SPACING.sm,
     marginBottom: SPACING.md,
   },
   detailRow: {
@@ -638,7 +648,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.xs,
-    paddingVertical: 6,
+    paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.lg,
   },
@@ -769,8 +779,8 @@ const styles = StyleSheet.create({
   statusBadgeLarge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingVertical: 6,
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.lg,
   },

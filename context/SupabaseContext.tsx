@@ -63,7 +63,7 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
   const [allowedEmailsLoading, setAllowedEmailsLoading] = useState(false);
   const [allowedEmailsError, setAllowedEmailsError] = useState<string | null>(null);
 
-  // Fetch all products with their price options
+  // Fetch all products with their price options in a single query
   const fetchProducts = useCallback(async () => {
     if (!isSupabaseConfigured()) {
       setProductsError("Supabase nije konfigurisan. Dodajte kredencijale u utils/supabase.ts");
@@ -74,29 +74,14 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
     setProductsError(null);
 
     try {
-      // Fetch products
-      const { data: productsData, error: productsErr } = await supabase
+      const { data, error } = await supabase
         .from("Products")
-        .select("*")
+        .select("*, price_options:Product_price_options(*)")
         .order("id", { ascending: true });
 
-      if (productsErr) throw productsErr;
+      if (error) throw error;
 
-      // Fetch all price options
-      const { data: optionsData, error: optionsErr } = await supabase
-        .from("Product_price_options")
-        .select("*")
-        .order("id", { ascending: true });
-
-      if (optionsErr) throw optionsErr;
-
-      // Combine products with their options
-      const productsWithOptions: ProductWithOptions[] = (productsData || []).map((product) => ({
-        ...product,
-        price_options: (optionsData || []).filter((opt) => opt.product_id === product.id),
-      }));
-
-      setProducts(productsWithOptions);
+      setProducts((data || []) as ProductWithOptions[]);
     } catch (error: any) {
       console.error("Error fetching products:", error);
       setProductsError(error.message || "Failed to fetch products");
@@ -272,24 +257,21 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
     setOrdersError(null);
 
     try {
-      // Fetch orders
-      const { data: ordersData, error: ordersErr } = await supabase
-        .from("Orders")
-        .select("*")
-        .order("created_at", { ascending: false });
+      // Fetch all order data in parallel
+      const [ordersRes, itemsRes, productsRes, optionsRes] = await Promise.all([
+        supabase.from("Orders").select("*").order("created_at", { ascending: false }),
+        supabase.from("Order_items").select("*"),
+        supabase.from("Products").select("*"),
+        supabase.from("Product_price_options").select("*"),
+      ]);
 
-      if (ordersErr) throw ordersErr;
+      if (ordersRes.error) throw ordersRes.error;
+      if (itemsRes.error) throw itemsRes.error;
 
-      // Fetch all order items
-      const { data: itemsData, error: itemsErr } = await supabase
-        .from("Order_items")
-        .select("*");
-
-      if (itemsErr) throw itemsErr;
-
-      // Fetch products and price options for reference
-      const { data: productsData } = await supabase.from("Products").select("*");
-      const { data: optionsData } = await supabase.from("Product_price_options").select("*");
+      const ordersData = ordersRes.data;
+      const itemsData = itemsRes.data;
+      const productsData = productsRes.data;
+      const optionsData = optionsRes.data;
 
       // Combine orders with items and calculate totals
       const ordersWithItems: OrderWithItems[] = (ordersData || []).map((order) => {

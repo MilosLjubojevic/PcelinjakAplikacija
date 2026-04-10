@@ -4,47 +4,15 @@ import {
   StyleSheet,
   Text,
   View,
-  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useApp } from "../context/AppContext";
 import Card from "../components/Card";
+import Button from "../components/Button";
+import { ListSkeleton } from "../components/SkeletonLoader";
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from "../constants/designTokens";
 import { ExpenseCategory, IncomeCategory } from "../types";
-
-const expenseCategoryLabels: Record<ExpenseCategory, string> = {
-  equipment: "Oprema",
-  feed: "Hrana",
-  medication: "Lekovi",
-  maintenance: "Održavanje",
-  transportation: "Transport",
-  packaging: "Pakovanje",
-  other: "Ostalo",
-};
-
-const incomeCategoryLabels: Record<IncomeCategory, string> = {
-  "honey-sale": "Med",
-  "nucleus-sale": "Rojevi",
-  "queen-sale": "Matice",
-  "wax-sale": "Vosak",
-  pollination: "Oprašivanje",
-  other: "Ostalo",
-};
-
-const categoryColors: Record<string, string> = {
-  equipment: COLORS.info,
-  feed: COLORS.success,
-  medication: COLORS.danger,
-  maintenance: COLORS.accent.queen,
-  transportation: COLORS.accent.nuclei,
-  packaging: COLORS.primaryDark,
-  "honey-sale": COLORS.primary,
-  "nucleus-sale": COLORS.success,
-  "queen-sale": COLORS.accent.nuclei,
-  "wax-sale": COLORS.accent.queen,
-  pollination: COLORS.info,
-  other: COLORS.textSecondary,
-};
+import { expenseCategoryLabels, incomeCategoryLabels, categoryColors } from "../utils/categoryLabels";
 
 interface MonthlyData {
   month: string;
@@ -54,7 +22,7 @@ interface MonthlyData {
 }
 
 export default function AnalyticsScreen() {
-  const { state, loading, metrics } = useApp();
+  const { state, loading, error, metrics, refreshData } = useApp();
 
   const analytics = useMemo(() => {
     const expenses = state.expenses || [];
@@ -141,9 +109,17 @@ export default function AnalyticsScreen() {
 
   if (loading) {
     return (
+      <View style={styles.container}>
+        <ListSkeleton count={4} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Učitavanje...</Text>
+        <Ionicons name="alert-circle" size={48} color={COLORS.danger} />
+        <Text style={styles.loadingText}>{error}</Text>
       </View>
     );
   }
@@ -163,13 +139,13 @@ export default function AnalyticsScreen() {
       <View style={styles.summaryRow}>
         <Card style={[styles.summaryCard, { borderLeftColor: COLORS.success }]}>
           <Text style={styles.summaryLabel}>Ukupni prihodi</Text>
-          <Text style={[styles.summaryValue, { color: COLORS.success }]}>
+          <Text style={[styles.summaryValue, { color: COLORS.success }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
             {analytics.totalIncome.toLocaleString("sr-RS")} KM
           </Text>
         </Card>
         <Card style={[styles.summaryCard, { borderLeftColor: COLORS.danger }]}>
           <Text style={styles.summaryLabel}>Ukupni troškovi</Text>
-          <Text style={[styles.summaryValue, { color: COLORS.danger }]}>
+          <Text style={[styles.summaryValue, { color: COLORS.danger }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
             {analytics.totalExpenses.toLocaleString("sr-RS")} KM
           </Text>
         </Card>
@@ -203,7 +179,7 @@ export default function AnalyticsScreen() {
 
       {/* Monthly Chart */}
       <Text style={styles.sectionTitle}>
-        Mesečni pregled ({analytics.currentYear})
+        Mjesečni pregled ({analytics.currentYear})
       </Text>
       <Card style={styles.chartCard}>
         {analytics.monthlyData.map((month) => (
@@ -344,7 +320,7 @@ export default function AnalyticsScreen() {
           <Text style={styles.statLabel}>Košnica</Text>
         </Card>
         <Card style={styles.statCard}>
-          <Ionicons name="location" size={24} color={COLORS.accent.nuclei} />
+          <Ionicons name="location" size={24} color={COLORS.accent.swarm} />
           <Text style={styles.statValue}>{metrics.totalLocations}</Text>
           <Text style={styles.statLabel}>Lokacija</Text>
         </Card>
@@ -360,7 +336,7 @@ export default function AnalyticsScreen() {
               ? `${Math.round(analytics.avgSaleValue).toLocaleString("sr-RS")}`
               : "0"}
           </Text>
-          <Text style={styles.statLabel}>Prosek KM</Text>
+          <Text style={styles.statLabel}>Prosjek KM</Text>
         </Card>
       </View>
 
@@ -445,7 +421,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   chartLabel: {
-    width: 32,
+    minWidth: 28,
     fontSize: FONT_SIZE.xs,
     color: COLORS.textMuted,
     fontWeight: "500",
@@ -472,7 +448,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.danger,
   },
   chartValue: {
-    width: 60,
+    minWidth: 50,
     fontSize: FONT_SIZE.xs,
     color: COLORS.textSecondary,
     textAlign: "right",
@@ -540,8 +516,8 @@ const styles = StyleSheet.create({
   breakdownAmount: {
     fontSize: FONT_SIZE.md,
     fontWeight: "600",
-    minWidth: 80,
     textAlign: "right",
+    flexShrink: 0,
   },
   statsGrid: {
     flexDirection: "row",

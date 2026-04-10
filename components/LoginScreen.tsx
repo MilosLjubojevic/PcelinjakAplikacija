@@ -15,8 +15,8 @@ export default function LoginScreen() {
       await signInWithGoogle();
     } catch (error: any) {
       Alert.alert(
-        "Greska pri prijavljivanju",
-        error.message || "Doslo je do greske. Pokusajte ponovo."
+        "Greška pri prijavljivanju",
+        error.message || "Došlo je do greške. Pokušajte ponovo."
       );
     } finally {
       setLoading(false);
@@ -29,7 +29,7 @@ export default function LoginScreen() {
         <View style={styles.iconCircle}>
           <Ionicons name="flower" size={48} color={COLORS.primary} />
         </View>
-        <Text style={styles.title}>Pcelinjak Ljubojevic</Text>
+        <Text style={styles.title}>Pčelinjak Ljubojević</Text>
         <Text style={styles.subtitle}>
           Prijavite se da pristupite aplikaciji
         </Text>

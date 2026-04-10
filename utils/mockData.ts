@@ -1,4 +1,4 @@
-import { AppState, Location, Queen, Nuclei, Sale, Hive, HiveRow } from '../types';
+import { AppState, Location, Queen, Sale, Hive, HiveRow } from '../types';
 
 export function generateMockData(): AppState {
   const now = new Date();
@@ -99,58 +99,6 @@ export function generateMockData(): AppState {
     },
   ];
 
-  // Generate nuclei
-  const nuclei: Nuclei[] = [
-    {
-      id: 'nuclei-1',
-      name: 'Roj 1',
-      status: 'for-sale',
-      queenId: 'queen-2',
-      frameCount: 5,
-      strength: 8,
-      createdDate: new Date(2024, 9, 15),
-      readyDate: new Date(2024, 10, 1),
-      price: 15000,
-      notes: 'Spreman za prodaju, jako jak',
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'nuclei-2',
-      name: 'Roj 2',
-      status: 'for-sale',
-      queenId: 'queen-4',
-      frameCount: 5,
-      strength: 7,
-      createdDate: new Date(2024, 9, 20),
-      readyDate: new Date(2024, 10, 5),
-      price: 14000,
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'nuclei-3',
-      name: 'Roj 3',
-      status: 'ready',
-      frameCount: 4,
-      strength: 6,
-      createdDate: new Date(2024, 10, 1),
-      notes: 'Skoro spreman',
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'nuclei-4',
-      name: 'Roj 4',
-      status: 'developing',
-      frameCount: 3,
-      strength: 5,
-      createdDate: new Date(2024, 10, 10),
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
-
   // Generate sales
   const sales: Sale[] = [
     {
@@ -224,10 +172,10 @@ export function generateMockData(): AppState {
     locations,
     queens,
     queenBoxRows: [],
-    nuclei,
     sales,
     expenses: [],
     incomes: [],
+    notes: [],
     lastUpdated: now,
   };
 }
@@ -252,6 +200,7 @@ function generateRow(
       number: i + 1,
       locationId,
       rowId: id,
+      type: 'hive' as const,
       health,
       hasQueen,
       queenId,
@@ -266,6 +215,7 @@ function generateRow(
     id,
     name,
     locationId,
+    capacity: hiveCount,
     hives,
     order,
     createdAt: now,

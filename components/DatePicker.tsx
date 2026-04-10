@@ -94,7 +94,7 @@ export default function DatePicker({
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <TouchableOpacity onPress={closePicker}>
-                  <Text style={styles.modalCancel}>Otkazi</Text>
+                  <Text style={styles.modalCancel}>Otkaži</Text>
                 </TouchableOpacity>
                 <Text style={styles.modalTitle}>{label}</Text>
                 <TouchableOpacity onPress={closePicker}>

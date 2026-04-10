@@ -18,10 +18,11 @@ export async function migrateLocalToSupabase(jsonString: string, userId: string)
     return uuid;
   };
 
-  // Map old health values to the valid "good" | "bad" constraint
+  // Map old health values to the valid "good" | "bad" | "warning" constraint
   const mapHiveHealth = (health: string): string => {
     if (health === 'good' || health === 'excellent') return 'good';
-    if (health === 'bad' || health === 'warning' || health === 'critical') return 'bad';
+    if (health === 'warning') return 'warning';
+    if (health === 'bad' || health === 'critical') return 'bad';
     return 'good';
   };
 
@@ -30,7 +31,6 @@ export async function migrateLocalToSupabase(jsonString: string, userId: string)
     supabase.from('locations').delete().eq('user_id', userId),
     supabase.from('queens').delete().eq('user_id', userId),
     supabase.from('queen_box_rows').delete().eq('user_id', userId),
-    supabase.from('nuclei').delete().eq('user_id', userId),
     supabase.from('sales').delete().eq('user_id', userId),
     supabase.from('expenses').delete().eq('user_id', userId),
     supabase.from('incomes').delete().eq('user_id', userId),
@@ -61,11 +61,13 @@ export async function migrateLocalToSupabase(jsonString: string, userId: string)
     for (const row of rows) {
       const rowId = newId(row.id);
 
+      const rowCapacity = row.capacity ?? (row.hives ? Math.max(row.hives.length, ...row.hives.map((h: any) => h.number || 0)) : 10);
       const { error: rowErr } = await supabase.from('hive_rows').insert([{
         id: rowId,
         user_id: userId,
         location_id: locId,
         name: row.name,
+        capacity: rowCapacity,
         order: row.order ?? 0,
         created_at: row.createdAt || new Date().toISOString(),
         updated_at: row.updatedAt || new Date().toISOString(),
@@ -86,6 +88,7 @@ export async function migrateLocalToSupabase(jsonString: string, userId: string)
           location_id: locId,
           row_id: rowId,
           number: hive.number,
+          type: hive.type || 'hive',
           health: mapHiveHealth(hive.health || 'good'),
           has_queen: hive.hasQueen ?? true,
           queen_id: queenId,
@@ -96,6 +99,8 @@ export async function migrateLocalToSupabase(jsonString: string, userId: string)
           is_active: hive.isActive ?? true,
           last_feeding_date: hive.lastFeedingDate || null,
           last_harvest_date: hive.lastHarvestDate || null,
+          swarm_status: hive.swarmStatus || null,
+          swarm_start_date: hive.swarmStartDate || null,
           created_at: hive.createdAt || new Date().toISOString(),
           updated_at: hive.updatedAt || new Date().toISOString(),
         }]);
@@ -176,15 +181,34 @@ export async function migrateLocalToSupabase(jsonString: string, userId: string)
   // ============================================================
   // 3. Migrate Queen Box Rows → Queen Boxes
   // ============================================================
+  // Build a name→id lookup from already-migrated locations
+  const locationNameToId = new Map<string, string>();
+  for (const loc of locations) {
+    locationNameToId.set((loc.name || '').toLowerCase(), idMap.get(loc.id) || '');
+  }
+
   const queenBoxRows = data.queenBoxRows || [];
   for (const row of queenBoxRows) {
     const rowId = newId(row.id);
+
+    // Resolve locationId: prefer existing locationId, fall back to string location name match
+    let locationId = row.locationId ? newId(row.locationId) : null;
+    if (!locationId && row.location) {
+      locationId = locationNameToId.get(row.location.toLowerCase()) || null;
+    }
+    // Fallback to first location if nothing matched
+    if (!locationId && locations.length > 0) {
+      locationId = idMap.get(locations[0].id) || '';
+    }
+
+    const rowCapacity = row.capacity ?? (row.queenBoxes ? Math.max(row.queenBoxes.length, ...row.queenBoxes.map((b: any) => b.number || 0)) : 10);
 
     await supabase.from('queen_box_rows').insert([{
       id: rowId,
       user_id: userId,
       name: row.name,
-      location: row.location || 'kuca',
+      location_id: locationId,
+      capacity: rowCapacity,
       order: row.order ?? 0,
       created_at: row.createdAt || new Date().toISOString(),
       updated_at: row.updatedAt || new Date().toISOString(),
@@ -211,32 +235,7 @@ export async function migrateLocalToSupabase(jsonString: string, userId: string)
   }
 
   // ============================================================
-  // 4. Migrate Nuclei
-  // ============================================================
-  const nuclei = data.nuclei || [];
-  for (const n of nuclei) {
-    const nId = newId(n.id);
-    const queenId = n.queenId ? newId(n.queenId) : null;
-
-    await supabase.from('nuclei').insert([{
-      id: nId,
-      user_id: userId,
-      name: n.name,
-      status: n.status,
-      queen_id: queenId,
-      frame_count: n.frameCount ?? 5,
-      strength: n.strength ?? 5,
-      created_date: n.createdDate || new Date().toISOString(),
-      ready_date: n.readyDate || null,
-      price: n.price ?? null,
-      notes: n.notes || null,
-      created_at: n.createdAt || new Date().toISOString(),
-      updated_at: n.updatedAt || new Date().toISOString(),
-    }]);
-  }
-
-  // ============================================================
-  // 5. Migrate Sales → Sale Items
+  // 4. Migrate Sales → Sale Items
   // ============================================================
   const sales = data.sales || [];
   for (const sale of sales) {
@@ -314,5 +313,63 @@ export async function migrateLocalToSupabase(jsonString: string, userId: string)
     }]);
   }
 
-  console.log(`Migration complete: migrated ${locations.length} locations, ${queens.length} queens, ${queenBoxRows.length} queen box rows, ${nuclei.length} nuclei, ${sales.length} sales, ${expenses.length} expenses, ${incomes.length} incomes`);
+  // ============================================================
+  // 8. Migrate Swarm Box Rows → hive_rows + hives (type='swarm')
+  // ============================================================
+  const swarmBoxRows = data.swarmBoxRows || [];
+  for (const sRow of swarmBoxRows) {
+    // Find matching location by name
+    let sLocId: string | null = null;
+    if (sRow.location) {
+      sLocId = locationNameToId.get(sRow.location.toLowerCase()) || null;
+    }
+    if (!sLocId && locations.length > 0) {
+      sLocId = idMap.get(locations[0].id) || '';
+    }
+    if (!sLocId) continue;
+
+    const sRowId = newId(sRow.id);
+    const swarmBoxes = sRow.swarmBoxes || [];
+    const sCapacity = sRow.capacity ?? (swarmBoxes.length > 0 ? Math.max(swarmBoxes.length, ...swarmBoxes.map((b: any) => b.number || 0)) : 10);
+
+    const { error: sRowErr } = await supabase.from('hive_rows').insert([{
+      id: sRowId,
+      user_id: userId,
+      location_id: sLocId,
+      name: sRow.name || 'Rojevi',
+      capacity: sCapacity,
+      order: sRow.order ?? 99,
+      created_at: sRow.createdAt || new Date().toISOString(),
+      updated_at: sRow.updatedAt || new Date().toISOString(),
+    }]);
+    if (sRowErr) {
+      console.error('Migration: swarm_box_row→hive_row insert error', sRowErr);
+      continue;
+    }
+
+    for (const sBox of swarmBoxes) {
+      const sBoxId = newId(sBox.id);
+      await supabase.from('hives').insert([{
+        id: sBoxId,
+        user_id: userId,
+        location_id: sLocId,
+        row_id: sRowId,
+        number: sBox.number,
+        type: 'swarm',
+        health: sBox.health === 'good' ? 'good' : 'warning',
+        has_queen: null,
+        queen_id: null,
+        frame_count: null,
+        is_harvested: false,
+        has_pollen: false,
+        is_active: sBox.isActive ?? true,
+        swarm_status: sBox.status || 'empty',
+        swarm_start_date: sBox.startDate || null,
+        created_at: sBox.createdAt || new Date().toISOString(),
+        updated_at: sBox.updatedAt || new Date().toISOString(),
+      }]);
+    }
+  }
+
+  console.log(`Migration complete: migrated ${locations.length} locations, ${queens.length} queens, ${queenBoxRows.length} queen box rows, ${swarmBoxRows.length} swarm box rows, ${sales.length} sales, ${expenses.length} expenses, ${incomes.length} incomes`);
 }

@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useCallback } from 'react';
 import {
   Modal as RNModal,
   View,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants/designTokens';
@@ -18,6 +19,8 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   showCloseButton?: boolean;
+  /** When true, closing will prompt "Discard changes?" confirmation */
+  hasUnsavedChanges?: boolean;
 }
 
 export default function Modal({
@@ -26,13 +29,29 @@ export default function Modal({
   title,
   children,
   showCloseButton = true,
+  hasUnsavedChanges = false,
 }: ModalProps) {
+  const handleClose = useCallback(() => {
+    if (hasUnsavedChanges) {
+      Alert.alert(
+        'Nesačuvane promjene',
+        'Da li želite da odbacite promjene?',
+        [
+          { text: 'Nastavi sa unosom', style: 'cancel' },
+          { text: 'Odbaci', style: 'destructive', onPress: onClose },
+        ]
+      );
+    } else {
+      onClose();
+    }
+  }, [hasUnsavedChanges, onClose]);
+
   return (
     <RNModal
       visible={visible}
       animationType="slide"
       transparent={true}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -43,7 +62,7 @@ export default function Modal({
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{title}</Text>
             {showCloseButton && (
-              <TouchableOpacity onPress={onClose} style={styles.closeButton} activeOpacity={0.7}>
+              <TouchableOpacity onPress={handleClose} style={styles.closeButton} activeOpacity={0.7}>
                 <Ionicons name="close" size={24} color={COLORS.textSecondary} />
               </TouchableOpacity>
             )}
@@ -52,6 +71,7 @@ export default function Modal({
             style={styles.modalContent}
             contentContainerStyle={styles.modalContentContainer}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             {children}
           </ScrollView>

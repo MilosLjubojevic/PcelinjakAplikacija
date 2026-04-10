@@ -51,7 +51,9 @@ export interface OrderWithItems extends Order {
 }
 
 // Hive-related types
-export type HiveHealth = "good" | "bad";
+export type HiveHealth = "good" | "bad" | "warning";
+export type HiveType = "hive" | "swarm";
+export type SwarmStatus = "empty" | "developing" | "ready";
 
 export interface HiveNote {
   id: string;
@@ -65,8 +67,10 @@ export interface Hive {
   number: number;
   locationId: string;
   rowId: string;
+  type: HiveType;
   health: HiveHealth;
-  hasQueen: boolean;
+  // Hive-specific fields (unused when type="swarm")
+  hasQueen?: boolean;
   queenId?: string;
   lastInspection?: Date;
   notes?: HiveNote[];
@@ -77,6 +81,10 @@ export interface Hive {
   feedingDates?: Date[];
   lastHarvestDate?: Date;
   harvestDates?: Date[];
+  isActive?: boolean;
+  // Swarm-specific fields (unused when type="hive")
+  swarmStatus?: SwarmStatus;
+  swarmStartDate?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -85,6 +93,7 @@ export interface HiveRow {
   id: string;
   name: string;
   locationId: string;
+  capacity: number;
   hives: Hive[];
   order: number;
   createdAt: Date;
@@ -142,32 +151,13 @@ export interface QueenBox {
   updatedAt: Date;
 }
 
-export type QueenBoxLocation = "kuca" | "suma";
-
 export interface QueenBoxRow {
   id: string;
   name: string;
-  location: QueenBoxLocation;
+  locationId: string;
+  capacity: number;
   queenBoxes: QueenBox[];
   order: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Nuclei-related types
-export type NucleiStatus = "developing" | "ready" | "for-sale" | "sold" | "merged";
-
-export interface Nuclei {
-  id: string;
-  name: string;
-  status: NucleiStatus;
-  queenId?: string;
-  frameCount: number;
-  strength: number;
-  createdDate: Date;
-  readyDate?: Date;
-  price?: number;
-  notes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -215,6 +205,7 @@ export type IncomeCategory =
   | "honey-sale"     // Prodaja meda
   | "nucleus-sale"   // Prodaja rojeva
   | "queen-sale"     // Prodaja matica
+  | "hive-sale"      // Prodaja košnica
   | "wax-sale"       // Prodaja voska
   | "pollination"    // Usluge oprašivanja
   | "other";         // Ostalo
@@ -249,6 +240,16 @@ export interface FinanceSummary {
   incomeByCategory: Record<IncomeCategory, number>;
 }
 
+// Note type (bilješke)
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  date: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Dashboard metrics
 export interface DashboardMetrics {
   totalHives: number;
@@ -273,9 +274,9 @@ export interface AppState {
   locations: Location[];
   queens: Queen[];
   queenBoxRows: QueenBoxRow[];
-  nuclei: Nuclei[];
   sales: Sale[];
   expenses: Expense[];
   incomes: Income[];
+  notes: Note[];
   lastUpdated: Date;
 }

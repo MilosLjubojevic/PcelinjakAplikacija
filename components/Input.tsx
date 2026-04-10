@@ -20,9 +20,11 @@ export default function Input({ label, error, containerStyle, style, ...props }:
           style,
         ]}
         placeholderTextColor={COLORS.textMuted}
+        accessibilityLabel={label || props.placeholder}
+        accessibilityHint={error ? `Greška: ${error}` : undefined}
         {...props}
       />
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && <Text style={styles.errorText} accessibilityRole="alert">{error}</Text>}
     </View>
   );
 }

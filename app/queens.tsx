@@ -1,29 +1,32 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
 import { useApp } from "../context/AppContext";
-import { QueenBox, QueenBoxRow, QueenBoxHealth, QueenBoxStatus, QueenBoxLocation } from "../types";
+import { useToast } from "../context/ToastContext";
+import { QueenBox, QueenBoxRow, QueenBoxHealth, QueenBoxStatus } from "../types";
 import Modal from "../components/Modal";
 import Input from "../components/Input";
 import Picker, { PickerOption } from "../components/Picker";
 import Button from "../components/Button";
 import EmptyState from "../components/EmptyState";
+import SearchBar from "../components/SearchBar";
 import DatePicker from "../components/DatePicker";
+import { GridSkeleton } from "../components/SkeletonLoader";
 import { formatDate } from "../utils/dateUtils";
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from "../constants/designTokens";
 
 const healthOptions: PickerOption[] = [
   { label: "Dobro", value: "good" },
-  { label: "Zahtijeva Paznju", value: "warning" },
+  { label: "Zahtijeva Pažnju", value: "warning" },
 ];
 
 const statusOptions: PickerOption[] = [
@@ -32,14 +35,10 @@ const statusOptions: PickerOption[] = [
   { label: "Zrela", value: "mature" },
 ];
 
-const locationOptions: PickerOption[] = [
-  { label: "Kuca", value: "kuca" },
-  { label: "Suma", value: "suma" },
-];
-
 export default function QueensScreen() {
-  const { state, loading, addQueenBoxRow, updateQueenBoxRow, deleteQueenBoxRow } = useApp();
-  const [selectedLocation, setSelectedLocation] = useState<QueenBoxLocation>("kuca");
+  const { state, loading, addQueenBoxRow, updateQueenBoxRow, deleteQueenBoxRow, refreshData } = useApp();
+  const { showToast } = useToast();
+  const [selectedLocationId, setSelectedLocationId] = useState(state.locations[0]?.id || "");
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
   const [addRowModalVisible, setAddRowModalVisible] = useState(false);
   const [editBoxModalVisible, setEditBoxModalVisible] = useState(false);
@@ -47,11 +46,14 @@ export default function QueensScreen() {
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     rowName: "",
-    startNumber: "",
-    endNumber: "",
-    location: "kuca" as QueenBoxLocation,
+    capacity: "",
+    locationId: state.locations[0]?.id || "",
   });
   const [saving, setSaving] = useState(false);
+  const [addBoxModalVisible, setAddBoxModalVisible] = useState(false);
+  const [pendingSlotRowId, setPendingSlotRowId] = useState<string | null>(null);
+  const [pendingSlotNumber, setPendingSlotNumber] = useState<number | null>(null);
+  const [newBoxNumber, setNewBoxNumber] = useState("");
   const [boxFormData, setBoxFormData] = useState({
     health: "good" as QueenBoxHealth,
     status: "empty" as QueenBoxStatus,
@@ -60,15 +62,70 @@ export default function QueensScreen() {
     notes: "",
   });
 
-  const queenBoxRows = state.queenBoxRows || [];
-  const filteredRows = queenBoxRows.filter((row) => row.location === selectedLocation);
+  const { width: screenWidth } = useWindowDimensions();
+
+  const queenBoxRows = useMemo(() => state.queenBoxRows || [], [state.queenBoxRows]);
+  const filteredRows = queenBoxRows.filter((row) => row.locationId === selectedLocationId);
+
+  // All used queen box numbers across all rows (for uniqueness validation)
+  const usedBoxNumbers = useMemo(() => {
+    const numbers = new Set<number>();
+    for (const row of queenBoxRows) {
+      for (const box of row.queenBoxes) {
+        numbers.add(box.number);
+      }
+    }
+    return numbers;
+  }, [queenBoxRows]);
+
+  // Responsive box sizing: fill available width evenly
+  const gridPadding = SPACING.lg + SPACING.md; // container margin + expanded content padding
+  const gridGap = SPACING.sm;
+  const availableWidth = screenWidth - gridPadding * 2;
+  const minBoxSize = 48;
+  const maxBoxSize = 64;
+  const columnsCount = Math.max(4, Math.floor((availableWidth + gridGap) / (minBoxSize + gridGap)));
+  const boxSize = Math.min(maxBoxSize, Math.floor((availableWidth - (columnsCount - 1) * gridGap) / columnsCount));
+
+  // Build location picker options from state.locations
+  const locationOptions: PickerOption[] = useMemo(
+    () => state.locations.map((loc) => ({ label: loc.name, value: loc.id })),
+    [state.locations]
+  );
+
+  // Auto-mature boxes that have passed 25 days — runs once on mount only
+  const autoMaturedRef = useRef(false);
+  useEffect(() => {
+    if (autoMaturedRef.current || loading) return;
+    autoMaturedRef.current = true;
+
+    const now = new Date();
+    for (const row of queenBoxRows) {
+      const maturedBoxes: QueenBox[] = [];
+      for (const box of row.queenBoxes) {
+        if (box.status !== "developing" || !box.startDate) continue;
+        const start = new Date(box.startDate);
+        const elapsed = (now.getTime() - start.getTime()) / (24 * 60 * 60 * 1000);
+        if (elapsed >= 25) {
+          maturedBoxes.push(box);
+        }
+      }
+      if (maturedBoxes.length > 0) {
+        const maturedIds = new Set(maturedBoxes.map(m => m.id));
+        const updatedBoxes = row.queenBoxes.map((b) =>
+          maturedIds.has(b.id) ? { ...b, status: "mature" as const, updatedAt: new Date() } : b
+        );
+        updateQueenBoxRow(row.id, { queenBoxes: updatedBoxes });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   const resetForm = () => {
     setFormData({
       rowName: "",
-      startNumber: "",
-      endNumber: "",
-      location: selectedLocation,
+      capacity: "",
+      locationId: selectedLocationId,
     });
   };
 
@@ -86,7 +143,7 @@ export default function QueensScreen() {
 
   const openAddModal = () => {
     resetForm();
-    setFormData((prev) => ({ ...prev, location: selectedLocation }));
+    setFormData((prev) => ({ ...prev, locationId: selectedLocationId }));
     setAddRowModalVisible(true);
   };
 
@@ -104,14 +161,13 @@ export default function QueensScreen() {
   };
 
   const handleAddRow = async () => {
-    if (!formData.rowName || !formData.startNumber || !formData.endNumber) {
+    if (!formData.rowName || !formData.capacity) {
       return;
     }
 
-    const startNum = parseInt(formData.startNumber);
-    const endNum = parseInt(formData.endNumber);
-    if (isNaN(startNum) || isNaN(endNum) || startNum > endNum || startNum < 1) {
-      Alert.alert("Greska", "Unesite validne brojeve (pocetni mora biti manji od krajnjeg).");
+    const capacity = parseInt(formData.capacity);
+    if (isNaN(capacity) || capacity < 1 || capacity > 200) {
+      Alert.alert("Greška", "Unesite validan kapacitet (1-200).");
       return;
     }
     setSaving(true);
@@ -119,26 +175,13 @@ export default function QueensScreen() {
     const now = new Date();
     const newRowId = Crypto.randomUUID();
 
-    // Create boxes for the new row with custom numbering
-    const newBoxes: QueenBox[] = [];
-    for (let num = startNum; num <= endNum; num++) {
-      newBoxes.push({
-        id: Crypto.randomUUID(),
-        number: num,
-        rowId: newRowId,
-        health: "good" as const,
-        status: "empty" as const,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-
-    // Create new row
+    // Create empty row with capacity — no pre-created boxes
     const newRow: QueenBoxRow = {
       id: newRowId,
       name: formData.rowName,
-      location: formData.location,
-      queenBoxes: newBoxes,
+      locationId: formData.locationId,
+      capacity,
+      queenBoxes: [],
       order: queenBoxRows.length,
       createdAt: now,
       updatedAt: now,
@@ -151,6 +194,60 @@ export default function QueensScreen() {
     resetForm();
   };
 
+  // Open number input modal for adding a queen box to an empty slot
+  const handleEmptySlotPress = (rowId: string, slotNumber: number) => {
+    setPendingSlotRowId(rowId);
+    setPendingSlotNumber(slotNumber);
+    setNewBoxNumber("");
+    setAddBoxModalVisible(true);
+  };
+
+  const handleConfirmAddBox = async () => {
+    if (!pendingSlotRowId || pendingSlotNumber === null || saving) return;
+
+    const num = parseInt(newBoxNumber);
+    if (isNaN(num) || num < 1 || num > 300) {
+      Alert.alert("Greška", "Unesite broj od 1 do 300.");
+      return;
+    }
+    if (usedBoxNumbers.has(num)) {
+      Alert.alert("Greška", `Oplodnjak broj ${num} već postoji.`);
+      return;
+    }
+
+    const rowId = pendingSlotRowId;
+    const row = queenBoxRows.find((r) => r.id === rowId);
+    if (!row) return;
+
+    // Close modal and capture data before async work
+    const boxesSnapshot = [...row.queenBoxes];
+    setSaving(true);
+    setAddBoxModalVisible(false);
+
+    const now = new Date();
+    const newBox: QueenBox = {
+      id: Crypto.randomUUID(),
+      number: num,
+      rowId,
+      health: "good",
+      status: "developing",
+      startDate: now,
+      maturityDate: new Date(now.getTime() + 25 * 24 * 60 * 60 * 1000),
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await updateQueenBoxRow(rowId, {
+      queenBoxes: [...boxesSnapshot, newBox],
+    });
+
+    showToast(`Oplodnjak ${num} dodan`);
+    setSaving(false);
+    setPendingSlotRowId(null);
+    setPendingSlotNumber(null);
+    setNewBoxNumber("");
+  };
+
   const handleSaveBox = async () => {
     if (!editingBox || !editingRowId) return;
 
@@ -161,14 +258,21 @@ export default function QueensScreen() {
     const startDate = boxFormData.startDate || undefined;
     const newNumber = parseInt(boxFormData.displayNumber);
 
-    if (isNaN(newNumber) || newNumber < 1) {
-      Alert.alert("Greska", "Unesite validan broj kutije.");
+    if (isNaN(newNumber) || newNumber < 1 || newNumber > 300) {
+      Alert.alert("Greška", "Unesite broj od 1 do 300.");
+      setSaving(false);
       return;
     }
 
-    // Calculate maturity date (21 days from start)
+    if (newNumber !== editingBox.number && usedBoxNumbers.has(newNumber)) {
+      Alert.alert("Greška", `Oplodnjak broj ${newNumber} već postoji.`);
+      setSaving(false);
+      return;
+    }
+
+    // Calculate maturity date (25 days from start)
     const maturityDate = startDate
-      ? new Date(startDate.getTime() + 21 * 24 * 60 * 60 * 1000)
+      ? new Date(startDate.getTime() + 25 * 24 * 60 * 60 * 1000)
       : undefined;
 
     const updatedBox: QueenBox = {
@@ -195,12 +299,12 @@ export default function QueensScreen() {
 
   const handleDeleteRow = (rowId: string, rowName: string) => {
     Alert.alert(
-      "Obrisi Red",
-      `Da li ste sigurni da zelite da obrisete "${rowName}" i sve kutije u njemu?`,
+      "Obriši Red",
+      `Da li ste sigurni da želite da obrišete "${rowName}" i sve oplodnjake u njemu?`,
       [
-        { text: "Otkazi", style: "cancel" },
+        { text: "Otkaži", style: "cancel" },
         {
-          text: "Obrisi",
+          text: "Obriši",
           style: "destructive",
           onPress: () => deleteQueenBoxRow(rowId),
         },
@@ -208,47 +312,17 @@ export default function QueensScreen() {
     );
   };
 
-  const handleAddBoxToRow = async (rowId: string) => {
+  const handleRemoveSlot = (rowId: string, boxId: string, boxNumber: number) => {
     const row = queenBoxRows.find((r) => r.id === rowId);
     if (!row) return;
-
-    // Find the highest number in the row and add 1
-    const maxNumber = row.queenBoxes.length > 0
-      ? Math.max(...row.queenBoxes.map((b) => b.number))
-      : 0;
-
-    const now = new Date();
-    const newBox: QueenBox = {
-      id: Crypto.randomUUID(),
-      number: maxNumber + 1,
-      rowId: rowId,
-      health: "good",
-      status: "empty",
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    await updateQueenBoxRow(rowId, {
-      queenBoxes: [...row.queenBoxes, newBox],
-    });
-  };
-
-  const handleRemoveBox = (rowId: string, boxId: string, boxNumber: number) => {
-    const row = queenBoxRows.find((r) => r.id === rowId);
-    if (!row) return;
-
-    if (row.queenBoxes.length <= 1) {
-      Alert.alert("Greska", "Red mora imati barem jednu kutiju.");
-      return;
-    }
 
     Alert.alert(
-      "Obrisi Kutiju",
-      `Da li ste sigurni da zelite da obrisete kutiju ${boxNumber}?`,
+      "Obriši Oplodnjak",
+      `Da li ste sigurni da želite da obrišete oplodnjak ${boxNumber}?`,
       [
-        { text: "Otkazi", style: "cancel" },
+        { text: "Otkaži", style: "cancel" },
         {
-          text: "Obrisi",
+          text: "Obriši",
           style: "destructive",
           onPress: async () => {
             const updatedBoxes = row.queenBoxes.filter((b) => b.id !== boxId);
@@ -259,36 +333,27 @@ export default function QueensScreen() {
     );
   };
 
-  // Quick status toggle: empty -> developing -> mature -> empty
+  // Quick status toggle: developing -> mature -> remove (1st tap starts timer via slot press)
   const handleQuickStatusToggle = async (rowId: string, box: QueenBox) => {
     const row = queenBoxRows.find((r) => r.id === rowId);
     if (!row) return;
 
-    let newStatus: QueenBoxStatus;
-    let newStartDate = box.startDate;
-
-    if (box.status === "empty") {
-      newStatus = "developing";
-      newStartDate = new Date(); // Set start date when starting development
-    } else if (box.status === "developing") {
-      newStatus = "mature";
-    } else {
-      newStatus = "empty";
-      newStartDate = undefined; // Clear start date when resetting to empty
+    if (box.status === "developing") {
+      // 2nd tap: mark as mature/ready
+      const updatedBox: QueenBox = {
+        ...box,
+        status: "mature",
+        updatedAt: new Date(),
+      };
+      const updatedBoxes = row.queenBoxes.map((b) =>
+        b.id === box.id ? updatedBox : b
+      );
+      await updateQueenBoxRow(rowId, { queenBoxes: updatedBoxes });
+    } else if (box.status === "mature") {
+      // 3rd tap: remove the box entirely
+      const updatedBoxes = row.queenBoxes.filter((b) => b.id !== box.id);
+      await updateQueenBoxRow(rowId, { queenBoxes: updatedBoxes });
     }
-
-    const updatedBox: QueenBox = {
-      ...box,
-      status: newStatus,
-      startDate: newStartDate,
-      updatedAt: new Date(),
-    };
-
-    const updatedBoxes = row.queenBoxes.map((b) =>
-      b.id === box.id ? updatedBox : b
-    );
-
-    await updateQueenBoxRow(rowId, { queenBoxes: updatedBoxes });
   };
 
   const toggleRow = (rowId: string) => {
@@ -326,22 +391,24 @@ export default function QueensScreen() {
   const calculateDaysUntilMature = (box: QueenBox): number | null => {
     if (box.status !== "developing" || !box.startDate) return null;
     const startDate = new Date(box.startDate);
-    const maturityDate = new Date(startDate.getTime() + 21 * 24 * 60 * 60 * 1000);
+    const maturityDate = new Date(startDate.getTime() + 25 * 24 * 60 * 60 * 1000);
     const today = new Date();
     const daysLeft = Math.ceil((maturityDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
     return Math.max(0, daysLeft);
   };
 
-  const getRowStats = (boxes: QueenBox[]) => {
-    const empty = boxes.filter((b) => b.status === "empty").length;
-    const developing = boxes.filter((b) => b.status === "developing").length;
-    const mature = boxes.filter((b) => b.status === "mature").length;
-    return { empty, developing, mature, total: boxes.length };
+  const getRowStats = (row: QueenBoxRow) => {
+    const empty = row.queenBoxes.filter((b) => b.status === "empty").length;
+    const developing = row.queenBoxes.filter((b) => b.status === "developing").length;
+    const mature = row.queenBoxes.filter((b) => b.status === "mature").length;
+    const emptySlots = row.capacity - row.queenBoxes.length;
+    return { empty, developing, mature, total: row.capacity, filled: row.queenBoxes.length, emptySlots };
   };
 
-  const getLocationStats = (location: QueenBoxLocation) => {
-    const rows = queenBoxRows.filter((r) => r.location === location);
-    const totalBoxes = rows.reduce((sum, r) => sum + r.queenBoxes.length, 0);
+  const getLocationStats = (locationId: string) => {
+    const rows = queenBoxRows.filter((r) => r.locationId === locationId);
+    const totalSlots = rows.reduce((sum, r) => sum + r.capacity, 0);
+    const totalFilled = rows.reduce((sum, r) => sum + r.queenBoxes.length, 0);
     const developing = rows.reduce(
       (sum, r) => sum + r.queenBoxes.filter((b) => b.status === "developing").length,
       0
@@ -350,88 +417,88 @@ export default function QueensScreen() {
       (sum, r) => sum + r.queenBoxes.filter((b) => b.status === "mature").length,
       0
     );
-    return { totalRows: rows.length, totalBoxes, developing, mature };
+    return { totalRows: rows.length, totalSlots, totalFilled, developing, mature };
   };
+
+  const [searchQuery, setSearchQuery] = useState("");
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Učitavanje...</Text>
+      <View style={styles.container}>
+        <GridSkeleton rows={3} cols={5} />
       </View>
     );
   }
 
-  const kucaStats = getLocationStats("kuca");
-  const sumaStats = getLocationStats("suma");
+  const selectedLocation = state.locations.find((l) => l.id === selectedLocationId);
+  const locationStats = selectedLocation ? getLocationStats(selectedLocationId) : null;
+
+  // Filter rows by search query
+  const searchedRows = searchQuery
+    ? filteredRows.filter(row =>
+        row.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        row.queenBoxes.some(b => b.number.toString().includes(searchQuery))
+      )
+    : filteredRows;
 
   return (
     <View style={styles.container}>
-      {/* Location Selector */}
-      <View style={styles.locationSelector}>
+      {/* Header with Refresh */}
+      <View style={styles.headerRow}>
+        <View style={{ flex: 1 }} />
         <TouchableOpacity
-          style={[
-            styles.locationButton,
-            selectedLocation === "kuca" && styles.locationButtonActive,
-          ]}
-          onPress={() => setSelectedLocation("kuca")}
+          style={styles.refreshButton}
+          onPress={refreshData}
+          disabled={loading}
+          accessibilityLabel="Osviježi podatke"
         >
-          <Ionicons
-            name="home"
-            size={24}
-            color={selectedLocation === "kuca" ? COLORS.surface : COLORS.textPrimary}
-          />
-          <View style={styles.locationInfo}>
-            <Text
-              style={[
-                styles.locationName,
-                selectedLocation === "kuca" && styles.locationNameActive,
-              ]}
-            >
-              Kuca
-            </Text>
-            <Text
-              style={[
-                styles.locationStats,
-                selectedLocation === "kuca" && styles.locationStatsActive,
-              ]}
-            >
-              {kucaStats.totalRows} redova • {kucaStats.totalBoxes} kutija
-            </Text>
-          </View>
+          <Ionicons name="refresh" size={20} color={COLORS.primary} />
         </TouchableOpacity>
+      </View>
 
-        <TouchableOpacity
-          style={[
-            styles.locationButton,
-            selectedLocation === "suma" && styles.locationButtonActive,
-          ]}
-          onPress={() => setSelectedLocation("suma")}
-        >
-          <Ionicons
-            name="leaf"
-            size={24}
-            color={selectedLocation === "suma" ? COLORS.surface : COLORS.textPrimary}
-          />
-          <View style={styles.locationInfo}>
-            <Text
+      {/* Location Selector — dynamic from state.locations */}
+      <View style={styles.locationSelector}>
+        {state.locations.map((loc) => {
+          const isActive = loc.id === selectedLocationId;
+          const stats = getLocationStats(loc.id);
+          return (
+            <TouchableOpacity
+              key={loc.id}
               style={[
-                styles.locationName,
-                selectedLocation === "suma" && styles.locationNameActive,
+                styles.locationButton,
+                isActive && styles.locationButtonActive,
               ]}
+              onPress={() => setSelectedLocationId(loc.id)}
             >
-              Suma
-            </Text>
-            <Text
-              style={[
-                styles.locationStats,
-                selectedLocation === "suma" && styles.locationStatsActive,
-              ]}
-            >
-              {sumaStats.totalRows} redova • {sumaStats.totalBoxes} kutija
-            </Text>
-          </View>
-        </TouchableOpacity>
+              <Ionicons
+                name={loc.name.toLowerCase().includes("kuc") ? "home" : "leaf"}
+                size={24}
+                color={isActive ? COLORS.surface : COLORS.textPrimary}
+              />
+              <View style={styles.locationInfo}>
+                <Text
+                  style={[
+                    styles.locationName,
+                    isActive && styles.locationNameActive,
+                  ]}
+                >
+                  {loc.name}
+                </Text>
+                <Text
+                  style={[
+                    styles.locationStats,
+                    isActive && styles.locationStatsActive,
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  {stats.totalRows} redova • {stats.totalFilled}/{stats.totalSlots} oplodnjaka
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Summary Stats */}
@@ -465,20 +532,21 @@ export default function QueensScreen() {
         </View>
       </View>
 
+      <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Pretraži redove/oplodnjake..." />
+
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {filteredRows.length === 0 ? (
+        {searchedRows.length === 0 ? (
           <EmptyState
             icon="star-outline"
-            title="Nema redova"
-            message={`Dodajte prvi red kutija za lokaciju ${selectedLocation === "kuca" ? "Kuca" : "Suma"}`}
-            actionLabel="Dodaj Red"
-            onAction={openAddModal}
+            title={searchQuery ? "Nema rezultata" : "Nema redova"}
+            message={searchQuery ? "Pokušajte drugi pojam za pretragu" : `Dodajte prvi red oplodnjaka za lokaciju ${selectedLocation?.name || ""}`}
+            actionLabel={searchQuery ? undefined : "Dodaj Red"}
+            onAction={searchQuery ? undefined : openAddModal}
           />
         ) : (
-          filteredRows.map((row) => {
+          searchedRows.map((row) => {
             const isExpanded = expandedRows.includes(row.id);
-            const stats = getRowStats(row.queenBoxes);
-            const sortedBoxes = [...row.queenBoxes].sort((a, b) => a.number - b.number);
+            const stats = getRowStats(row);
 
             return (
               <View key={row.id} style={styles.rowContainer}>
@@ -495,15 +563,15 @@ export default function QueensScreen() {
                     />
                     <Text style={styles.rowName}>{row.name}</Text>
                     <View style={styles.rowBadge}>
-                      <Text style={styles.rowBadgeText}>{stats.total}</Text>
+                      <Text style={styles.rowBadgeText}>{stats.filled}/{stats.total}</Text>
                     </View>
                   </View>
 
                   {/* Quick Stats */}
                   <View style={styles.quickStats}>
                     <View style={styles.statDot}>
-                      <View style={[styles.dot, { backgroundColor: COLORS.textMuted }]} />
-                      <Text style={styles.statNumber}>{stats.empty}</Text>
+                      <View style={[styles.dot, { backgroundColor: COLORS.borderMedium }]} />
+                      <Text style={styles.statNumber}>{stats.emptySlots}</Text>
                     </View>
                     <View style={styles.statDot}>
                       <View style={[styles.dot, { backgroundColor: COLORS.info }]} />
@@ -516,11 +584,12 @@ export default function QueensScreen() {
                   </View>
                 </TouchableOpacity>
 
-                {/* Boxes Grid (shown when expanded) */}
+                {/* Slot Grid (shown when expanded) */}
                 {isExpanded && (
                   <View style={styles.expandedContent}>
                     <View style={styles.boxesGrid}>
-                      {sortedBoxes.map((box) => {
+                      {/* Existing queen boxes (unordered — numbers are random) */}
+                      {row.queenBoxes.map((box) => {
                         const daysUntilMature = calculateDaysUntilMature(box);
 
                         return (
@@ -528,12 +597,15 @@ export default function QueensScreen() {
                             key={box.id}
                             style={[
                               styles.queenBox,
+                              { width: boxSize, height: boxSize, borderRadius: boxSize * 0.18 },
                               { borderColor: box.status === "mature" ? COLORS.success : getHealthColor(box.health) },
                               box.status === "empty" && styles.queenBoxEmpty,
                               box.status === "mature" && styles.queenBoxMature,
                             ]}
                             onPress={() => handleQuickStatusToggle(row.id, box)}
                             onLongPress={() => openEditBoxModal(box, row.id)}
+                            accessibilityLabel={`Oplodnjak ${box.number}, ${box.status === 'empty' ? 'prazan' : box.status === 'developing' ? 'u razvoju' : 'zreo'}`}
+                            accessibilityHint="Pritisni za promjenu statusa, dugo drži za izmjenu"
                           >
                             <Text style={styles.boxNumber}>{box.number}</Text>
 
@@ -571,24 +643,36 @@ export default function QueensScreen() {
                           </TouchableOpacity>
                         );
                       })}
+
+                      {/* Empty add slots for remaining capacity */}
+                      {row.queenBoxes.length < row.capacity &&
+                        Array.from({ length: row.capacity - row.queenBoxes.length }, (_, i) => (
+                          <TouchableOpacity
+                            key={`empty-${i}`}
+                            style={[
+                              styles.queenBox,
+                              styles.emptySlot,
+                              { width: boxSize, height: boxSize, borderRadius: boxSize * 0.18 },
+                            ]}
+                            onPress={() => handleEmptySlotPress(row.id, i + 1)}
+                            accessibilityLabel="Prazan slot"
+                            accessibilityHint="Pritisni da dodaš oplodnjak"
+                          >
+                            <Ionicons name="add" size={FONT_SIZE.lg} color={COLORS.textMuted} />
+                          </TouchableOpacity>
+                        ))
+                      }
                     </View>
 
                     {/* Row Actions */}
                     <View style={styles.rowActions}>
                       <TouchableOpacity
                         style={styles.rowActionButton}
-                        onPress={() => handleAddBoxToRow(row.id)}
-                      >
-                        <Ionicons name="add-circle-outline" size={20} color={COLORS.success} />
-                        <Text style={styles.rowActionText}>Dodaj kutiju</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.rowActionButton}
                         onPress={() => handleDeleteRow(row.id, row.name)}
                       >
                         <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
                         <Text style={[styles.rowActionText, { color: COLORS.danger }]}>
-                          Obrisi red
+                          Obriši red
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -614,6 +698,7 @@ export default function QueensScreen() {
           resetForm();
         }}
         title="Dodaj Novi Red"
+        hasUnsavedChanges={formData.rowName !== '' || formData.capacity !== ''}
       >
         <Input
           label="Naziv reda"
@@ -624,48 +709,32 @@ export default function QueensScreen() {
 
         <Picker
           label="Lokacija"
-          value={formData.location}
+          value={formData.locationId}
           options={locationOptions}
           onValueChange={(value) =>
-            setFormData({ ...formData, location: value as QueenBoxLocation })
+            setFormData({ ...formData, locationId: value as string })
           }
         />
 
-        <View style={styles.formRow}>
-          <View style={styles.formHalf}>
-            <Input
-              label="Od broja"
-              value={formData.startNumber}
-              onChangeText={(text) => setFormData({ ...formData, startNumber: text })}
-              placeholder="Npr. 1"
-              keyboardType="numeric"
-            />
-          </View>
-          <View style={styles.formHalf}>
-            <Input
-              label="Do broja"
-              value={formData.endNumber}
-              onChangeText={(text) => setFormData({ ...formData, endNumber: text })}
-              placeholder="Npr. 50"
-              keyboardType="numeric"
-            />
-          </View>
-        </View>
+        <Input
+          label="Kapacitet (broj mjesta)"
+          value={formData.capacity}
+          onChangeText={(text) => setFormData({ ...formData, capacity: text })}
+          placeholder="Npr. 30"
+          keyboardType="numeric"
+        />
 
         <View style={styles.infoBox}>
           <Ionicons name="information-circle" size={20} color={COLORS.primary} />
           <Text style={styles.infoText}>
-            Bice kreirano{" "}
-            {formData.startNumber && formData.endNumber
-              ? Math.max(0, parseInt(formData.endNumber) - parseInt(formData.startNumber) + 1) || 0
-              : 0}{" "}
-            kutija sa brojevima od {formData.startNumber || "?"} do {formData.endNumber || "?"}.
+            Red će imati {formData.capacity ? parseInt(formData.capacity) || 0 : 0} praznih mjesta.
+            Dodajte oplodnjake pritiskom na prazne slotove.
           </Text>
         </View>
 
         <View style={styles.modalButtons}>
           <Button
-            title="Otkazi"
+            title="Otkaži"
             onPress={() => {
               setAddRowModalVisible(false);
               resetForm();
@@ -676,7 +745,64 @@ export default function QueensScreen() {
           <Button
             title="Dodaj Red"
             onPress={handleAddRow}
-            disabled={!formData.rowName || !formData.startNumber || !formData.endNumber}
+            disabled={!formData.rowName || !formData.capacity}
+            loading={saving}
+            style={{ flex: 1, marginLeft: SPACING.sm }}
+          />
+        </View>
+      </Modal>
+
+      {/* Add Box Number Modal */}
+      <Modal
+        visible={addBoxModalVisible}
+        onClose={() => {
+          setAddBoxModalVisible(false);
+          setPendingSlotRowId(null);
+          setPendingSlotNumber(null);
+          setNewBoxNumber("");
+        }}
+        title="Dodaj Oplodnjak"
+      >
+        <Input
+          label="Broj oplodnjaka (1-300)"
+          value={newBoxNumber}
+          onChangeText={setNewBoxNumber}
+          placeholder="Npr. 42"
+          keyboardType="numeric"
+        />
+
+        {newBoxNumber !== "" && usedBoxNumbers.has(parseInt(newBoxNumber)) && (
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle" size={SPACING.xl} color={COLORS.danger} />
+            <Text style={styles.errorText}>
+              Oplodnjak broj {newBoxNumber} već postoji.
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.infoBox}>
+          <Ionicons name="information-circle" size={SPACING.xl} color={COLORS.primary} />
+          <Text style={styles.infoText}>
+            Tajmer od 25 dana će automatski početi.
+          </Text>
+        </View>
+
+        <View style={styles.modalButtons}>
+          <Button
+            title="Otkaži"
+            onPress={() => {
+              setAddBoxModalVisible(false);
+              setPendingSlotRowId(null);
+              setPendingSlotNumber(null);
+              setNewBoxNumber("");
+            }}
+            variant="secondary"
+            style={{ flex: 1, marginRight: SPACING.sm }}
+          />
+          <Button
+            title="Dodaj"
+            onPress={handleConfirmAddBox}
+            disabled={!newBoxNumber || usedBoxNumbers.has(parseInt(newBoxNumber)) || saving}
             loading={saving}
             style={{ flex: 1, marginLeft: SPACING.sm }}
           />
@@ -690,13 +816,14 @@ export default function QueensScreen() {
           setEditBoxModalVisible(false);
           resetBoxForm();
         }}
-        title={`Kutija ${editingBox?.number || ""}`}
+        title={`Oplodnjak ${editingBox?.number || ""}`}
+        hasUnsavedChanges={boxFormData.notes !== '' || boxFormData.startDate !== null}
       >
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Informacije</Text>
 
           <Input
-            label="Broj kutije"
+            label="Broj oplodnjaka"
             value={boxFormData.displayNumber}
             onChangeText={(text) =>
               setBoxFormData({ ...boxFormData, displayNumber: text })
@@ -706,7 +833,7 @@ export default function QueensScreen() {
           />
 
           <Picker
-            label="Status kutije"
+            label="Status oplodnjaka"
             value={boxFormData.status}
             options={statusOptions}
             onValueChange={(value) =>
@@ -728,7 +855,7 @@ export default function QueensScreen() {
           <Text style={styles.sectionTitle}>Datumi</Text>
 
           <DatePicker
-            label="Datum pocetka (kada je maticnjak postavljen)"
+            label="Datum početka (kada je matičnjak postavljen)"
             value={boxFormData.startDate}
             onChange={(date) =>
               setBoxFormData({ ...boxFormData, startDate: date })
@@ -740,10 +867,10 @@ export default function QueensScreen() {
             <View style={styles.maturityInfo}>
               <Ionicons name="time-outline" size={18} color={COLORS.info} />
               <Text style={styles.maturityText}>
-                Matica ce biti zrela:{" "}
+                Matica će biti zrela:{" "}
                 {formatDate(
                   new Date(
-                    boxFormData.startDate.getTime() + 21 * 24 * 60 * 60 * 1000
+                    boxFormData.startDate.getTime() + 25 * 24 * 60 * 60 * 1000
                   )
                 )}
               </Text>
@@ -753,7 +880,7 @@ export default function QueensScreen() {
 
         <View style={styles.sectionContainer}>
           <Input
-            label="Beleske (opciono)"
+            label="Bilješke (opciono)"
             value={boxFormData.notes}
             onChangeText={(text) =>
               setBoxFormData({ ...boxFormData, notes: text })
@@ -764,9 +891,24 @@ export default function QueensScreen() {
           />
         </View>
 
+        {/* Delete box button */}
+        {editingBox && editingRowId && (
+          <TouchableOpacity
+            style={styles.deleteBoxButton}
+            onPress={() => {
+              setEditBoxModalVisible(false);
+              resetBoxForm();
+              handleRemoveSlot(editingRowId, editingBox.id, editingBox.number);
+            }}
+          >
+            <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
+            <Text style={styles.deleteBoxText}>Obriši oplodnjak</Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.modalButtons}>
           <Button
-            title="Otkazi"
+            title="Otkaži"
             onPress={() => {
               setEditBoxModalVisible(false);
               resetBoxForm();
@@ -775,7 +917,7 @@ export default function QueensScreen() {
             style={{ flex: 1, marginRight: SPACING.sm }}
           />
           <Button
-            title="Sacuvaj"
+            title="Sačuvaj"
             onPress={handleSaveBox}
             loading={saving}
             style={{ flex: 1, marginLeft: SPACING.sm }}
@@ -791,16 +933,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
+  headerRow: {
+    flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.background,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.sm,
   },
-  loadingText: {
-    marginTop: SPACING.md,
-    fontSize: FONT_SIZE.md,
-    color: COLORS.textSecondary,
+  refreshButton: {
+    padding: SPACING.sm,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surface,
+    ...SHADOW.sm,
   },
   locationSelector: {
     flexDirection: "row",
@@ -936,9 +1079,6 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   queenBox: {
-    width: 55,
-    height: 55,
-    borderRadius: 10,
     borderWidth: 3,
     backgroundColor: COLORS.background,
     alignItems: "center",
@@ -951,6 +1091,18 @@ const styles = StyleSheet.create({
   },
   queenBoxMature: {
     backgroundColor: COLORS.successLight,
+  },
+  emptySlot: {
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: COLORS.borderMedium,
+    backgroundColor: COLORS.background,
+    opacity: 0.6,
+  },
+  emptySlotNumber: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    fontWeight: "500",
   },
   boxNumber: {
     fontSize: FONT_SIZE.md,
@@ -988,7 +1140,7 @@ const styles = StyleSheet.create({
   },
   rowActions: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     marginTop: SPACING.md,
     paddingTop: SPACING.md,
     borderTopWidth: 1,
@@ -1028,6 +1180,22 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     marginBottom: SPACING.lg,
   },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    backgroundColor: COLORS.background,
+    padding: SPACING.md,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+    marginBottom: SPACING.lg,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.danger,
+  },
   infoText: {
     flex: 1,
     fontSize: FONT_SIZE.sm,
@@ -1036,13 +1204,6 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: "row",
     marginTop: SPACING.sm,
-  },
-  formRow: {
-    flexDirection: "row",
-    gap: SPACING.md,
-  },
-  formHalf: {
-    flex: 1,
   },
   sectionContainer: {
     marginBottom: SPACING.xl,
@@ -1072,6 +1233,22 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: FONT_SIZE.sm,
     color: COLORS.info,
+    fontWeight: "500",
+  },
+  deleteBoxButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.sm,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+    borderRadius: RADIUS.md,
+  },
+  deleteBoxText: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.danger,
     fontWeight: "500",
   },
 });

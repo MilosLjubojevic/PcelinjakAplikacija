@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "../utils/supabase";
+import { COLORS } from "../constants/designTokens";
 
 export default function GoogleAuthCallback() {
   const router = useRouter();
@@ -27,8 +28,8 @@ export default function GoogleAuthCallback() {
   }, [params.code]);
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#FFF8E7" }}>
-      <ActivityIndicator size="large" color="#FFB800" />
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: COLORS.background }}>
+      <ActivityIndicator size="large" color={COLORS.primary} />
     </View>
   );
 }

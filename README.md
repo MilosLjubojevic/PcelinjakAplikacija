@@ -1,50 +1,145 @@
-# Welcome to your Expo app 👋
+# Pcelinjak Aplikacija
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Mobilna aplikacija za upravljanje pcelinjacima. Pracenje kosnica, matica, rojeva, prodaje i finansija — sve na jednom mestu.
 
-## Get started
+## Funkcionalnosti
 
-1. Install dependencies
+### Kosnice i lokacije
 
-   ```bash
-   npm install
-   ```
+- Evidencija lokacija sa redovima i kosnicama
+- Pracenje zdravlja kosnica (dobro / lose)
+- Beleske sa fotografijama za svaki pregled
+- Datumi hranjenja i berbe meda
+- Broj ramova, status polena i zetve
 
-2. Start the app
+### Matice
 
-   ```bash
-   npx expo start
-   ```
+- Registar matica sa rasom, statusom i produktivnoscu
+- Pracenje zrelosti u nucleo-kutijama (25-dnevni ciklus)
+- Status: developing, mature, mated, laying, retired
+- Rase: kranjska, italijanska, buckfast, kavkaska, hibrid
 
-In the output, you'll find options to open the app in a
+### Rojevi (Nuclei)
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Evidencija rojeva sa statusom i snagom
+- Statusi: developing, ready, for-sale, sold, merged
+- Povezivanje sa maticom i pracenje broja ramova
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Prodaja
 
-## Get a fresh project
+- Kreiranje prodaja sa vise stavki (rojevi, matice, med, vosak)
+- Pracenje kupaca i statusa narudzbi
+- Istorija svih transakcija
 
-When you're ready, run:
+### Finansije
 
-```bash
-npm run reset-project
+- Evidencija prihoda i rashoda po kategorijama
+- Rashodi: oprema, hrana, lekovi, odrzavanje, transport, pakovanje
+- Prihodi: prodaja meda, rojeva, matica, voska, oprasivanje
+- Pregled neto profita
+
+### Dashboard
+
+- Pregled kljucnih metrika: ukupno kosnica, matica, rojeva
+- Kosnice koje zahtevaju paznju
+- Mesecna prodaja
+- Widget za vremensku prognozu
+- Pozdrav prema dobu dana (srpski jezik)
+
+### Admin panel
+
+- Upravljanje narudzbama iz web prodavnice
+- Pregled proizvoda i zaliha
+- Upozorenja za nizak nivo zaliha
+
+## Tehnicki stek
+
+| Sloj              | Tehnologija                          |
+| ----------------- | ------------------------------------ |
+| Framework         | Expo 54 / React Native 0.81          |
+| Jezik             | TypeScript                           |
+| Navigacija        | expo-router (Drawer)                 |
+| Backend           | Supabase (Auth, PostgreSQL, Storage) |
+| Autentifikacija   | Google OAuth preko Supabase          |
+| Lokalno skladiste | AsyncStorage (samo auth sesija)      |
+| UUID generacija   | expo-crypto                          |
+
+## Struktura projekta
+
+```
+app/                  # Ekrani (file-based routing)
+  index.tsx           # Dashboard
+  hive.tsx            # Upravljanje kosnicama
+  queens.tsx          # Matice
+  nuclei.tsx          # Rojevi
+  finansije.tsx       # Finansije (prihodi/rashodi)
+  analytics.tsx       # Prodaja
+  orders.tsx          # Narudzbe
+  products.tsx        # Proizvodi
+  admin.tsx           # Admin panel
+  google-auth.tsx     # Google prijava
+components/           # UI komponente (Button, Card, Modal, Picker...)
+constants/            # Design tokeni (boje, razmaci, velicine)
+context/              # React konteksti
+  AppContext.tsx      # Glavni state (Supabase CRUD)
+  AuthContext.tsx     # Autentifikacija
+  SupabaseContext.tsx # Proizvodi, narudzbe, dozvoljeni emailovi
+  ThemeContext.tsx    # Tamni rezim (light/dark/system)
+services/             # Supabase servis
+types/                # TypeScript interfejsi
+utils/                # Pomocne funkcije (mapper, migracija, valuta)
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Pokretanje
 
-## Learn more
+### Preduslovi
 
-To learn more about developing your project with Expo, look at the following resources:
+- Node.js 18+
+- Expo CLI
+- Supabase projekat sa konfigurisanim tabelama (videti `supabase_migration.sql`)
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### Instalacija
 
-## Join the community
+```bash
+npm install
+```
 
-Join our community of developers creating universal apps.
+### Podesavanje okruzenja
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Napravite `.env` fajl u korenu projekta:
+
+```env
+EXPO_PUBLIC_SUPABASE_URL=<vas-supabase-url>
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<vas-anon-key>
+```
+
+### Pokretanje aplikacije
+
+```bash
+npx expo start
+```
+
+### Build (EAS)
+
+```bash
+eas build --platform android
+eas build --platform ios
+```
+
+## Baza podataka
+
+Aplikacija koristi 14 Supabase tabela sa RLS politikama:
+
+`locations`, `hive_rows`, `hives`, `hive_notes`, `hive_feeding_dates`, `hive_harvest_dates`, `queens`, `queen_box_rows`, `queen_boxes`, `nuclei`, `sales`, `sale_items`, `expenses`, `incomes`
+
+Sve tabele koriste UUID primarne kljuceve i `user_id` FK prema `auth.users`.
+
+SQL migracija: [`supabase_migration.sql`](supabase_migration.sql)
+
+## Valuta
+
+Aplikacija koristi KM (Konvertibilna Marka) sa srpskim lokalom za formatiranje.
+
+## Licenca
+
+Privatni projekat.

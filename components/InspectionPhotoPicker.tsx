@@ -17,7 +17,7 @@ export default function InspectionPhotoPicker({
 }: InspectionPhotoPickerProps) {
   const pickImage = async () => {
     if (photos.length >= maxPhotos) {
-      Alert.alert('Limit', `Maksimalno ${maxPhotos} fotografija po beleški`);
+      Alert.alert('Limit', `Maksimalno ${maxPhotos} fotografija po bilješci`);
       return;
     }
 
@@ -41,7 +41,7 @@ export default function InspectionPhotoPicker({
 
   const takePhoto = async () => {
     if (photos.length >= maxPhotos) {
-      Alert.alert('Limit', `Maksimalno ${maxPhotos} fotografija po beleški`);
+      Alert.alert('Limit', `Maksimalno ${maxPhotos} fotografija po bilješci`);
       return;
     }
 

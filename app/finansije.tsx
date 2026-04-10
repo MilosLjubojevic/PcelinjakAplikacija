@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
-  ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,61 +14,16 @@ import Card from "../components/Card";
 import EmptyState from "../components/EmptyState";
 import Input from "../components/Input";
 import Modal from "../components/Modal";
-import Picker, { PickerOption } from "../components/Picker";
+import Picker from "../components/Picker";
+import { ListSkeleton } from "../components/SkeletonLoader";
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from "../constants/designTokens";
 import { useApp } from "../context/AppContext";
 import { Expense, ExpenseCategory, Income, IncomeCategory, FinanceSummary } from "../types";
+import { expenseCategoryOptions, incomeCategoryOptions, getExpenseCategoryLabel, getIncomeCategoryLabel, getCategoryColor } from "../utils/categoryLabels";
 import { formatDate } from "../utils/dateUtils";
 
-const expenseCategoryOptions: PickerOption[] = [
-  { label: "Oprema", value: "equipment" },
-  { label: "Hrana za pčele", value: "feed" },
-  { label: "Lekovi", value: "medication" },
-  { label: "Održavanje", value: "maintenance" },
-  { label: "Transport", value: "transportation" },
-  { label: "Pakovanje", value: "packaging" },
-  { label: "Ostalo", value: "other" },
-];
-
-const incomeCategoryOptions: PickerOption[] = [
-  { label: "Prodaja meda", value: "honey-sale" },
-  { label: "Prodaja rojeva", value: "nucleus-sale" },
-  { label: "Prodaja matica", value: "queen-sale" },
-  { label: "Prodaja voska", value: "wax-sale" },
-  { label: "Usluge oprašivanja", value: "pollination" },
-  { label: "Ostalo", value: "other" },
-];
-
-const getExpenseCategoryLabel = (category: ExpenseCategory): string => {
-  const option = expenseCategoryOptions.find((opt) => opt.value === category);
-  return option ? option.label : category;
-};
-
-const getIncomeCategoryLabel = (category: IncomeCategory): string => {
-  const option = incomeCategoryOptions.find((opt) => opt.value === category);
-  return option ? option.label : category;
-};
-
-const getCategoryColor = (category: ExpenseCategory | IncomeCategory): string => {
-  const colors: Record<string, string> = {
-    equipment: COLORS.info,
-    feed: COLORS.success,
-    medication: COLORS.danger,
-    maintenance: COLORS.accent.queen,
-    transportation: COLORS.accent.nuclei,
-    packaging: COLORS.primaryDark,
-    "honey-sale": COLORS.primary,
-    "nucleus-sale": COLORS.success,
-    "queen-sale": COLORS.accent.nuclei,
-    "wax-sale": COLORS.accent.queen,
-    pollination: COLORS.info,
-    other: COLORS.textSecondary,
-  };
-  return colors[category] || COLORS.textSecondary;
-};
-
 export default function FinansijeScreen() {
-  const { state, loading, addExpense, updateExpense, deleteExpense, addIncome, updateIncome, deleteIncome } = useApp();
+  const { state, loading, error, addExpense, updateExpense, deleteExpense, addIncome, updateIncome, deleteIncome, refreshData } = useApp();
   const [modalType, setModalType] = useState<"expense" | "income">("expense");
   const [modalVisible, setModalVisible] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -201,16 +156,30 @@ export default function FinansijeScreen() {
     resetForm();
   };
 
-  const handleDeleteExpense = async (id: string) => {
-    await deleteExpense(id);
+  const handleDeleteExpense = (id: string) => {
+    Alert.alert(
+      "Obriši trošak",
+      "Da li ste sigurni da želite obrisati ovaj trošak?",
+      [
+        { text: "Otkaži", style: "cancel" },
+        { text: "Obriši", style: "destructive", onPress: () => deleteExpense(id) },
+      ]
+    );
   };
 
-  const handleDeleteIncome = async (id: string) => {
-    await deleteIncome(id);
+  const handleDeleteIncome = (id: string) => {
+    Alert.alert(
+      "Obriši prihod",
+      "Da li ste sigurni da želite obrisati ovaj prihod?",
+      [
+        { text: "Otkaži", style: "cancel" },
+        { text: "Obriši", style: "destructive", onPress: () => deleteIncome(id) },
+      ]
+    );
   };
 
-  // Calculate finance summary
-  const calculateSummary = (): FinanceSummary => {
+  // Memoized finance summary
+  const summary = useMemo((): FinanceSummary => {
     const expenses = state.expenses || [];
     const incomes = state.incomes || [];
 
@@ -247,15 +216,22 @@ export default function FinansijeScreen() {
       expensesByCategory,
       incomeByCategory,
     };
-  };
-
-  const summary = calculateSummary();
+  }, [state.expenses, state.incomes]);
 
   if (loading) {
     return (
+      <View style={styles.container}>
+        <ListSkeleton count={4} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Učitavanje...</Text>
+        <Ionicons name="alert-circle" size={48} color={COLORS.danger} />
+        <Text style={styles.loadingText}>{error}</Text>
+        <Button title="Pokušaj ponovo" onPress={refreshData} style={{ marginTop: SPACING.md }} />
       </View>
     );
   }
@@ -313,7 +289,7 @@ export default function FinansijeScreen() {
           <View style={styles.categorySection}>
             <View style={styles.sectionHeader}>
               <Ionicons name="pie-chart" size={20} color={COLORS.primaryDark} />
-              <Text style={styles.sectionTitle}>Prihodi po Kategorijama</Text>
+              <Text style={styles.sectionTitle}>Prihodi po kategorijama</Text>
             </View>
             <Card style={styles.categoryCard}>
               {(Object.entries(summary.incomeByCategory) as [IncomeCategory, number][])
@@ -433,7 +409,7 @@ export default function FinansijeScreen() {
           <View style={styles.categorySection}>
             <View style={styles.sectionHeader}>
               <Ionicons name="pie-chart" size={20} color={COLORS.primaryDark} />
-              <Text style={styles.sectionTitle}>Troškovi po Kategorijama</Text>
+              <Text style={styles.sectionTitle}>Troškovi po kategorijama</Text>
             </View>
             <Card style={styles.categoryCard}>
               {(Object.entries(summary.expensesByCategory) as [ExpenseCategory, number][])
@@ -542,7 +518,7 @@ export default function FinansijeScreen() {
               </Card>
             ))
         )}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 80 }} />
       </ScrollView>
 
       {/* Floating Action Buttons */}
@@ -565,6 +541,7 @@ export default function FinansijeScreen() {
           setModalVisible(false);
           resetForm();
         }}
+        hasUnsavedChanges={formData.description !== '' || formData.amount !== ''}
         title={
           modalType === "expense"
             ? editingExpense
@@ -763,12 +740,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   categoryName: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.sm,
     color: COLORS.textPrimary,
     fontWeight: "500",
   },
   categoryAmount: {
-    fontSize: 14,
+    fontSize: FONT_SIZE.sm,
     fontWeight: "600",
     color: COLORS.primaryDark,
   },
@@ -819,7 +796,7 @@ const styles = StyleSheet.create({
   categoryBadge: {
     alignSelf: "flex-start",
     paddingHorizontal: SPACING.md,
-    paddingVertical: 5,
+    paddingVertical: SPACING.xs,
     borderRadius: RADIUS.md,
     ...SHADOW.sm,
   },

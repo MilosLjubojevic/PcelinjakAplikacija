@@ -55,20 +55,24 @@ export const uploadProductImage = async (
   }
 
   try {
-    // Fetch the image as a blob
-    const response = await fetch(uri);
-    const blob = await response.blob();
-
     // Create a unique file name
     const fileExt = fileName.split(".").pop() || "jpg";
     const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
     const filePath = `products/${uniqueFileName}`;
 
+    // Use FormData for reliable React Native file uploads
+    const formData = new FormData();
+    formData.append("", {
+      uri,
+      name: uniqueFileName,
+      type: `image/${fileExt === "png" ? "png" : "jpeg"}`,
+    } as any);
+
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
       .from(STORAGE_BUCKET)
-      .upload(filePath, blob, {
-        contentType: blob.type || "image/jpeg",
+      .upload(filePath, formData, {
+        contentType: `multipart/form-data`,
         upsert: false,
       });
 

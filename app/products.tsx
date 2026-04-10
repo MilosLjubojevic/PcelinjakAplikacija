@@ -25,7 +25,7 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from "../constants/designT
 
 const productTypeOptions: PickerOption[] = [
   { label: "Med", value: "Med" },
-  { label: "Vocni Med", value: "Vocni Med" },
+  { label: "Voćni Med", value: "Voćni Med" },
   { label: "Polen", value: "Polen" },
   { label: "Preparati", value: "Preparati" },
 ];
@@ -129,12 +129,12 @@ export default function ProductsScreen() {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permissionResult.granted) {
-      Alert.alert("Greska", "Potrebna je dozvola za pristup galeriji");
+      Alert.alert("Greška", "Potrebna je dozvola za pristup galeriji");
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -150,7 +150,7 @@ export default function ProductsScreen() {
       if (uploadedPath) {
         setFormData({ ...formData, image: uploadedPath });
       } else {
-        Alert.alert("Greska", "Nije moguce otpremiti sliku");
+        Alert.alert("Greška", "Nije moguće otpremiti sliku");
       }
       setImageUploading(false);
     }
@@ -158,7 +158,7 @@ export default function ProductsScreen() {
 
   const handleSaveProduct = async () => {
     if (!formData.product_name.trim()) {
-      Alert.alert("Greska", "Naziv proizvoda je obavezan");
+      Alert.alert("Greška", "Naziv proizvoda je obavezan");
       return;
     }
     setSaving(true);
@@ -167,14 +167,14 @@ export default function ProductsScreen() {
       const success = await updateProduct(editingProduct.id, formData);
       if (!success) {
         setSaving(false);
-        Alert.alert("Greska", "Nije moguce azurirati proizvod");
+        Alert.alert("Greška", "Nije moguće ažurirati proizvod");
         return;
       }
     } else {
       const newProduct = await addProduct(formData);
       if (!newProduct) {
         setSaving(false);
-        Alert.alert("Greska", "Nije moguce dodati proizvod");
+        Alert.alert("Greška", "Nije moguće dodati proizvod");
         return;
       }
     }
@@ -186,17 +186,17 @@ export default function ProductsScreen() {
 
   const handleDeleteProduct = (product: ProductWithOptions) => {
     Alert.alert(
-      "Obrisi Proizvod",
-      `Da li ste sigurni da zelite da obrisete "${product.product_name}"? Ovo ce obrisati i sve opcije cena.`,
+      "Obriši Proizvod",
+      `Da li ste sigurni da želite da obrišete "${product.product_name}"? Ovo će obrisati i sve opcije cijena.`,
       [
-        { text: "Otkazi", style: "cancel" },
+        { text: "Otkaži", style: "cancel" },
         {
-          text: "Obrisi",
+          text: "Obriši",
           style: "destructive",
           onPress: async () => {
             const success = await deleteProduct(product.id);
             if (!success) {
-              Alert.alert("Greska", "Nije moguce obrisati proizvod");
+              Alert.alert("Greška", "Nije moguće obrisati proizvod");
             }
           },
         },
@@ -208,7 +208,7 @@ export default function ProductsScreen() {
     if (!selectedProductId) return;
 
     if (!priceFormData.size.trim() || !priceFormData.price.trim()) {
-      Alert.alert("Greska", "Velicina i cena su obavezni");
+      Alert.alert("Greška", "Veličina i cijena su obavezni");
       return;
     }
     setSaving(true);
@@ -224,14 +224,14 @@ export default function ProductsScreen() {
       const success = await updatePriceOption(editingPriceOption.id, optionData);
       if (!success) {
         setSaving(false);
-        Alert.alert("Greska", "Nije moguce azurirati opciju cene");
+        Alert.alert("Greška", "Nije moguće ažurirati opciju cijene");
         return;
       }
     } else {
       const newOption = await addPriceOption(optionData);
       if (!newOption) {
         setSaving(false);
-        Alert.alert("Greska", "Nije moguce dodati opciju cene");
+        Alert.alert("Greška", "Nije moguće dodati opciju cijene");
         return;
       }
     }
@@ -243,17 +243,17 @@ export default function ProductsScreen() {
 
   const handleDeletePriceOption = (option: ProductPriceOption) => {
     Alert.alert(
-      "Obrisi Opciju Cene",
-      `Da li ste sigurni da zelite da obrisete "${option.size}"?`,
+      "Obriši Opciju Cijene",
+      `Da li ste sigurni da želite da obrišete "${option.size}"?`,
       [
-        { text: "Otkazi", style: "cancel" },
+        { text: "Otkaži", style: "cancel" },
         {
-          text: "Obrisi",
+          text: "Obriši",
           style: "destructive",
           onPress: async () => {
             const success = await deletePriceOption(option.id);
             if (!success) {
-              Alert.alert("Greska", "Nije moguce obrisati opciju cene");
+              Alert.alert("Greška", "Nije moguće obrisati opciju cijene");
             }
           },
         },
@@ -262,7 +262,7 @@ export default function ProductsScreen() {
   };
 
   const getPriceRange = (options: ProductPriceOption[]): string => {
-    if (options.length === 0) return "Nema cena";
+    if (options.length === 0) return "Nema cijena";
 
     const prices = options.map((o) => parseFloat(o.price) || 0);
     const min = Math.min(...prices);
@@ -293,7 +293,7 @@ export default function ProductsScreen() {
         <Ionicons name="settings-outline" size={64} color={COLORS.primary} />
         <Text style={styles.configTitle}>Supabase nije konfigurisan</Text>
         <Text style={styles.configText}>
-          Otvorite utils/supabase.ts i dodajte vase Supabase kredencijale:{"\n\n"}
+          Otvorite utils/supabase.ts i dodajte vaše Supabase kredencijale:{"\n\n"}
           - SUPABASE_URL{"\n"}
           - SUPABASE_ANON_KEY{"\n"}
           - STORAGE_BUCKET
@@ -307,7 +307,7 @@ export default function ProductsScreen() {
       <View style={styles.errorContainer}>
         <Ionicons name="alert-circle" size={64} color={COLORS.danger} />
         <Text style={styles.errorText}>{productsError}</Text>
-        <Button title="Pokusaj ponovo" onPress={fetchProducts} />
+        <Button title="Pokušaj ponovo" onPress={fetchProducts} />
       </View>
     );
   }
@@ -337,7 +337,7 @@ export default function ProductsScreen() {
           <EmptyState
             icon="pricetag-outline"
             title="Nema proizvoda"
-            message="Dodajte prvi proizvod da biste zapoceli"
+            message="Dodajte prvi proizvod da biste započeli"
             actionLabel="Dodaj Proizvod"
             onAction={openAddModal}
           />
@@ -400,7 +400,7 @@ export default function ProductsScreen() {
                 {/* Price Options */}
                 <View style={styles.priceOptionsSection}>
                   <View style={styles.priceOptionsHeader}>
-                    <Text style={styles.priceOptionsTitle}>Opcije cena</Text>
+                    <Text style={styles.priceOptionsTitle}>Opcije cijena</Text>
                     <TouchableOpacity
                       onPress={() => openAddPriceModal(product.id)}
                       style={styles.addPriceButton}
@@ -410,7 +410,7 @@ export default function ProductsScreen() {
                   </View>
 
                   {product.price_options.length === 0 ? (
-                    <Text style={styles.noPricesText}>Nema opcija cena</Text>
+                    <Text style={styles.noPricesText}>Nema opcija cijena</Text>
                   ) : (
                     <View style={styles.priceOptionsList}>
                       {product.price_options.map((option) => (
@@ -461,7 +461,7 @@ export default function ProductsScreen() {
           setModalVisible(false);
           resetForm();
         }}
-        title={editingProduct ? "Izmeni Proizvod" : "Novi Proizvod"}
+        title={editingProduct ? "Izmijeni Proizvod" : "Novi Proizvod"}
       >
         <Input
           label="Naziv proizvoda *"
@@ -511,7 +511,7 @@ export default function ProductsScreen() {
         </View>
 
         <Input
-          label="Alt tekst (za pristupacnost)"
+          label="Alt tekst (za pristupačnost)"
           value={formData.alt}
           onChangeText={(text) => setFormData({ ...formData, alt: text })}
           placeholder="Opis slike..."
@@ -519,7 +519,7 @@ export default function ProductsScreen() {
 
         <View style={styles.modalButtons}>
           <Button
-            title="Otkazi"
+            title="Otkaži"
             onPress={() => {
               setModalVisible(false);
               resetForm();
@@ -528,7 +528,7 @@ export default function ProductsScreen() {
             style={{ flex: 1, marginRight: SPACING.sm }}
           />
           <Button
-            title={editingProduct ? "Sacuvaj" : "Dodaj"}
+            title={editingProduct ? "Sačuvaj" : "Dodaj"}
             onPress={handleSaveProduct}
             style={{ flex: 1, marginLeft: SPACING.sm }}
             disabled={imageUploading}
@@ -544,17 +544,17 @@ export default function ProductsScreen() {
           setPriceModalVisible(false);
           resetPriceForm();
         }}
-        title={editingPriceOption ? "Izmeni Opciju Cene" : "Nova Opcija Cene"}
+        title={editingPriceOption ? "Izmijeni Opciju Cijene" : "Nova Opcija Cijene"}
       >
         <Input
-          label="Velicina/Pakovanje *"
+          label="Veličina/Pakovanje *"
           value={priceFormData.size}
           onChangeText={(text) => setPriceFormData({ ...priceFormData, size: text })}
           placeholder="Npr. 1kg, 500g, 250ml..."
         />
 
         <Input
-          label="Cena (KM) *"
+          label="Cijena (KM) *"
           value={priceFormData.price}
           onChangeText={(text) => setPriceFormData({ ...priceFormData, price: text })}
           placeholder="Npr. 15.00"
@@ -562,7 +562,7 @@ export default function ProductsScreen() {
         />
 
         <Input
-          label="Kolicina na stanju"
+          label="Količina na stanju"
           value={priceFormData.stock}
           onChangeText={(text) => setPriceFormData({ ...priceFormData, stock: text })}
           placeholder="0"
@@ -571,7 +571,7 @@ export default function ProductsScreen() {
 
         <View style={styles.modalButtons}>
           <Button
-            title="Otkazi"
+            title="Otkaži"
             onPress={() => {
               setPriceModalVisible(false);
               resetPriceForm();
@@ -580,7 +580,7 @@ export default function ProductsScreen() {
             style={{ flex: 1, marginRight: SPACING.sm }}
           />
           <Button
-            title={editingPriceOption ? "Sacuvaj" : "Dodaj"}
+            title={editingPriceOption ? "Sačuvaj" : "Dodaj"}
             onPress={handleSavePriceOption}
             loading={saving}
             style={{ flex: 1, marginLeft: SPACING.sm }}
@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
   typeBadge: {
     backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
+    paddingVertical: SPACING.xs,
     borderRadius: RADIUS.sm,
     alignSelf: "flex-start",
     marginBottom: SPACING.xs,
@@ -774,13 +774,13 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     fontWeight: "600",
     color: COLORS.textPrimary,
-    minWidth: 60,
+    flexShrink: 0,
   },
   priceOptionPrice: {
     fontSize: FONT_SIZE.md,
     fontWeight: "bold",
     color: COLORS.success,
-    minWidth: 80,
+    flexShrink: 0,
   },
   priceOptionStock: {
     fontSize: FONT_SIZE.xs,

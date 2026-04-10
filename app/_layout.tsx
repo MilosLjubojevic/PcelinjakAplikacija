@@ -1,11 +1,13 @@
+import { useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Drawer } from "expo-router/drawer";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ActivityIndicator, View } from "react-native";
+import * as Updates from "expo-updates";
 import { AppProvider } from "../context/AppContext";
 import { SupabaseProvider } from "../context/SupabaseContext";
 import { AuthProvider, useAuth } from "../context/AuthContext";
-import { ThemeProvider } from "../context/ThemeContext";
+import { ToastProvider } from "../context/ToastContext";
 import ErrorBoundary from "../components/ErrorBoundary";
 import LoginScreen from "../components/LoginScreen";
 import CustomDrawerContent from "../components/CustomDrawerContent";
@@ -28,6 +30,7 @@ function AuthGate() {
 
   return (
     <ErrorBoundary>
+    <ToastProvider>
     <AppProvider>
       <SupabaseProvider>
         <Drawer
@@ -60,8 +63,8 @@ function AuthGate() {
           <Drawer.Screen
             name="index"
             options={{
-              drawerLabel: "Pocetna",
-              title: "Pcelinjak Ljubojevic",
+              drawerLabel: "Početna",
+              title: "Pčelinjak Ljubojević",
               drawerIcon: ({ color, size }) => (
                 <Ionicons name="home-outline" size={size} color={color} />
               ),
@@ -70,8 +73,8 @@ function AuthGate() {
           <Drawer.Screen
             name="hive"
             options={{
-              drawerLabel: "Kosnice",
-              title: "Kosnice",
+              drawerLabel: "Košnice",
+              title: "Košnice",
               drawerIcon: ({ color, size }) => (
                 <Ionicons name="grid-outline" size={size} color={color} />
               ),
@@ -84,16 +87,6 @@ function AuthGate() {
               title: "Matice",
               drawerIcon: ({ color, size }) => (
                 <Ionicons name="star-outline" size={size} color={color} />
-              ),
-            }}
-          />
-          <Drawer.Screen
-            name="nuclei"
-            options={{
-              drawerLabel: "Rojevi",
-              title: "Rojevi",
-              drawerIcon: ({ color, size }) => (
-                <Ionicons name="cube-outline" size={size} color={color} />
               ),
             }}
           />
@@ -120,10 +113,20 @@ function AuthGate() {
           <Drawer.Screen
             name="orders"
             options={{
-              drawerLabel: "Porudzbine",
-              title: "Porudzbine",
+              drawerLabel: "Porudžbine",
+              title: "Porudžbine",
               drawerIcon: ({ color, size }) => (
                 <Ionicons name="receipt-outline" size={size} color={color} />
+              ),
+            }}
+          />
+          <Drawer.Screen
+            name="biljeske"
+            options={{
+              drawerLabel: "Bilješke",
+              title: "Bilješke",
+              drawerIcon: ({ color, size }) => (
+                <Ionicons name="document-text-outline" size={size} color={color} />
               ),
             }}
           />
@@ -156,18 +159,28 @@ function AuthGate() {
         </Drawer>
       </SupabaseProvider>
     </AppProvider>
+    </ToastProvider>
     </ErrorBoundary>
   );
 }
 
 export default function Layout() {
+  useEffect(() => {
+    if (__DEV__) return;
+    Updates.checkForUpdateAsync()
+      .then(({ isAvailable }) => {
+        if (isAvailable) {
+          Updates.fetchUpdateAsync().then(() => Updates.reloadAsync());
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <AuthProvider>
-          <AuthGate />
-        </AuthProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <AuthGate />
+      </AuthProvider>
     </GestureHandlerRootView>
   );
 }

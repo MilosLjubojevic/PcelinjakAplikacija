@@ -2,7 +2,7 @@ import { supabase, isSupabaseConfigured } from '../utils/supabase';
 import {
   Location, HiveRow, Hive, HiveNote,
   Queen, QueenBoxRow, QueenBox,
-  Nuclei, Sale, SaleItem, Expense, Income,
+  Sale, SaleItem, Expense, Income, Note,
 } from '../types';
 import {
   locationToDb, dbToLocation,
@@ -12,15 +12,15 @@ import {
   queenToDb, dbToQueen,
   queenBoxRowToDb, dbToQueenBoxRow,
   queenBoxToDb, dbToQueenBox,
-  nucleiToDb, dbToNuclei,
   saleToDb, dbToSale,
   saleItemToDb, dbToSaleItem,
   expenseToDb, dbToExpense,
   incomeToDb, dbToIncome,
-  groupBy,
+  noteToDb, dbToNote,
+  groupBy, deduplicateByKey,
   DbLocation, DbHiveRow, DbHive, DbHiveNote, DbHiveDateEntry,
   DbQueen, DbQueenBoxRow, DbQueenBox,
-  DbNuclei, DbSale, DbSaleItem, DbExpense, DbIncome,
+  DbSale, DbSaleItem, DbExpense, DbIncome, DbNote,
 } from '../utils/supabaseMapper';
 
 // ============================================================
@@ -31,13 +31,14 @@ export async function fetchAllLocations(userId: string): Promise<Location[]> {
   const [locsRes, rowsRes, hivesRes, notesRes, feedRes, harvestRes] = await Promise.all([
     supabase.from('locations').select('*').order('created_at'),
     supabase.from('hive_rows').select('*').order('order'),
-    supabase.from('hives').select('*'),
+    supabase.from('hives').select('*').order('number'),
     supabase.from('hive_notes').select('*').order('created_at', { ascending: false }),
     supabase.from('hive_feeding_dates').select('*').order('date'),
     supabase.from('hive_harvest_dates').select('*').order('date'),
   ]);
 
-  if (locsRes.error) throw locsRes.error;
+  const firstError = locsRes.error || rowsRes.error || hivesRes.error || notesRes.error || feedRes.error || harvestRes.error;
+  if (firstError) throw firstError;
 
   const locs = (locsRes.data || []) as DbLocation[];
   const rows = (rowsRes.data || []) as DbHiveRow[];
@@ -69,8 +70,12 @@ export async function fetchAllLocations(userId: string): Promise<Location[]> {
     dbToHiveRow(r, hivesByRow[r.id] || [])
   );
 
+  // Deduplicate rows with the same name within the same location
+  // (keeps the first one by created_at order, which is the original)
+  const deduplicatedRows = deduplicateByKey(assembledRows, r => `${r.locationId}:${r.name}`);
+
   // Group rows by location_id
-  const rowsByLoc = groupBy(assembledRows, 'locationId');
+  const rowsByLoc = groupBy(deduplicatedRows, 'locationId');
 
   // Assemble locations with their rows
   return locs.map(l => dbToLocation(l, rowsByLoc[l.id] || []));
@@ -84,10 +89,8 @@ export async function insertLocation(userId: string, loc: Location): Promise<boo
       .insert([locationToDb(loc, userId)]);
     if (locErr) throw locErr;
 
-    // Insert nested rows and hives
-    for (const row of loc.rows) {
-      await insertHiveRow(userId, row);
-    }
+    // Insert nested rows and hives in parallel
+    await Promise.all(loc.rows.map(row => insertHiveRow(userId, row)));
 
     return true;
   } catch (error) {
@@ -151,23 +154,22 @@ export async function syncLocationChildren(
       if (error) throw error;
     }
 
-    // Added rows (insert row + all their hives)
+    // Added rows (insert row + all their hives) in parallel
     const addedRows = newRows.filter(r => !oldRowIds.has(r.id));
-    for (const row of addedRows) {
-      await insertHiveRow(userId, row);
-    }
+    await Promise.all(addedRows.map(row => insertHiveRow(userId, row)));
 
-    // Modified rows — diff hives within each
+    // Modified rows — diff hives within each, in parallel
     const modifiedRows = newRows.filter(r => oldRowIds.has(r.id));
-    for (const newRow of modifiedRows) {
+    await Promise.all(modifiedRows.map(async (newRow) => {
       const oldRow = oldRows.find(r => r.id === newRow.id)!;
 
       // Update row scalar fields if changed
-      if (oldRow.name !== newRow.name || oldRow.order !== newRow.order) {
+      if (oldRow.name !== newRow.name || oldRow.order !== newRow.order || oldRow.capacity !== newRow.capacity) {
         const { error } = await supabase
           .from('hive_rows')
           .update({
             name: newRow.name,
+            capacity: newRow.capacity,
             order: newRow.order,
             updated_at: new Date().toISOString(),
           })
@@ -177,7 +179,7 @@ export async function syncLocationChildren(
 
       // Diff hives within this row
       await syncRowHives(userId, newRow.id, oldRow.hives, newRow.hives);
-    }
+    }));
 
     return true;
   } catch (error) {
@@ -202,18 +204,16 @@ async function syncRowHives(
     if (error) throw error;
   }
 
-  // Added hives
+  // Added hives in parallel
   const addedHives = newHives.filter(h => !oldHiveIds.has(h.id));
-  for (const hive of addedHives) {
-    await insertHive(userId, hive);
-  }
+  await Promise.all(addedHives.map(hive => insertHive(userId, hive)));
 
-  // Modified hives
+  // Modified hives in parallel
   const modifiedHives = newHives.filter(h => oldHiveIds.has(h.id));
-  for (const newHive of modifiedHives) {
+  await Promise.all(modifiedHives.map(newHive => {
     const oldHive = oldHives.find(h => h.id === newHive.id)!;
-    await syncHiveUpdate(userId, oldHive, newHive);
-  }
+    return syncHiveUpdate(userId, oldHive, newHive);
+  }));
 }
 
 async function syncHiveUpdate(userId: string, oldHive: Hive, newHive: Hive): Promise<void> {
@@ -225,6 +225,9 @@ async function syncHiveUpdate(userId: string, oldHive: Hive, newHive: Hive): Pro
     .update({ ...updateFields, updated_at: new Date().toISOString() })
     .eq('id', newHive.id);
   if (error) throw error;
+
+  // Swarms don't have notes, feeding dates, or harvest dates
+  if (newHive.type === 'swarm') return;
 
   // Sync notes
   const oldNotes = oldHive.notes || [];
@@ -307,10 +310,8 @@ async function insertHiveRow(userId: string, row: HiveRow): Promise<void> {
     .insert([hiveRowToDb(row, userId)]);
   if (error) throw error;
 
-  // Insert nested hives
-  for (const hive of row.hives) {
-    await insertHive(userId, hive);
-  }
+  // Insert nested hives in parallel
+  await Promise.all(row.hives.map(hive => insertHive(userId, hive)));
 }
 
 async function insertHive(userId: string, hive: Hive): Promise<void> {
@@ -319,37 +320,48 @@ async function insertHive(userId: string, hive: Hive): Promise<void> {
     .insert([hiveToDb(hive, userId)]);
   if (error) throw error;
 
-  // Insert notes
+  // Swarms don't have notes, feeding dates, or harvest dates
+  if (hive.type === 'swarm') return;
+
+  // Insert notes, feeding dates, and harvest dates in parallel
+  const childInserts: Promise<void>[] = [];
+
   if (hive.notes && hive.notes.length > 0) {
-    const { error: noteErr } = await supabase
-      .from('hive_notes')
-      .insert(hive.notes.map(n => hiveNoteToDb(n, hive.id, userId)));
-    if (noteErr) throw noteErr;
+    childInserts.push((async () => {
+      const { error: noteErr } = await supabase
+        .from('hive_notes')
+        .insert(hive.notes!.map(n => hiveNoteToDb(n, hive.id, userId)));
+      if (noteErr) throw noteErr;
+    })());
   }
 
-  // Insert feeding dates
   if (hive.feedingDates && hive.feedingDates.length > 0) {
-    const { error: feedErr } = await supabase
-      .from('hive_feeding_dates')
-      .insert(hive.feedingDates.map(d => ({
-        hive_id: hive.id,
-        user_id: userId,
-        date: d.toISOString(),
-      })));
-    if (feedErr) throw feedErr;
+    childInserts.push((async () => {
+      const { error: feedErr } = await supabase
+        .from('hive_feeding_dates')
+        .insert(hive.feedingDates!.map(d => ({
+          hive_id: hive.id,
+          user_id: userId,
+          date: d.toISOString(),
+        })));
+      if (feedErr) throw feedErr;
+    })());
   }
 
-  // Insert harvest dates
   if (hive.harvestDates && hive.harvestDates.length > 0) {
-    const { error: harvestErr } = await supabase
-      .from('hive_harvest_dates')
-      .insert(hive.harvestDates.map(d => ({
-        hive_id: hive.id,
-        user_id: userId,
-        date: d.toISOString(),
-      })));
-    if (harvestErr) throw harvestErr;
+    childInserts.push((async () => {
+      const { error: harvestErr } = await supabase
+        .from('hive_harvest_dates')
+        .insert(hive.harvestDates!.map(d => ({
+          hive_id: hive.id,
+          user_id: userId,
+          date: d.toISOString(),
+        })));
+      if (harvestErr) throw harvestErr;
+    })());
   }
+
+  await Promise.all(childInserts);
 }
 
 // ============================================================
@@ -426,9 +438,10 @@ export async function deleteQueen(userId: string, id: string): Promise<boolean> 
 export async function fetchAllQueenBoxRows(userId: string): Promise<QueenBoxRow[]> {
   const [rowsRes, boxesRes] = await Promise.all([
     supabase.from('queen_box_rows').select('*').order('order'),
-    supabase.from('queen_boxes').select('*'),
+    supabase.from('queen_boxes').select('*').order('number'),
   ]);
-  if (rowsRes.error) throw rowsRes.error;
+  const firstError = rowsRes.error || boxesRes.error;
+  if (firstError) throw firstError;
 
   const rows = (rowsRes.data || []) as DbQueenBoxRow[];
   const boxes = (boxesRes.data || []) as DbQueenBox[];
@@ -462,7 +475,8 @@ export async function updateQueenBoxRowScalars(userId: string, id: string, updat
   try {
     const dbUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
     if (updates.name !== undefined) dbUpdates.name = updates.name;
-    if (updates.location !== undefined) dbUpdates.location = updates.location;
+    if (updates.locationId !== undefined) dbUpdates.location_id = updates.locationId;
+    if (updates.capacity !== undefined) dbUpdates.capacity = updates.capacity;
     if (updates.order !== undefined) dbUpdates.order = updates.order;
 
     const { error } = await supabase
@@ -503,9 +517,9 @@ export async function syncQueenBoxRowChildren(
       if (error) throw error;
     }
 
-    // Modified boxes
+    // Modified boxes in parallel
     const modifiedBoxes = newBoxes.filter(b => oldIds.has(b.id));
-    for (const box of modifiedBoxes) {
+    await Promise.all(modifiedBoxes.map(async (box) => {
       const dbData = queenBoxToDb(box, userId);
       const { id, user_id, row_id, ...updateFields } = dbData;
       const { error } = await supabase
@@ -513,7 +527,7 @@ export async function syncQueenBoxRowChildren(
         .update({ ...updateFields, updated_at: new Date().toISOString() })
         .eq('id', box.id);
       if (error) throw error;
-    }
+    }));
 
     return true;
   } catch (error) {
@@ -538,71 +552,6 @@ export async function deleteQueenBoxRow(userId: string, id: string): Promise<boo
 }
 
 // ============================================================
-// NUCLEI (flat entity)
-// ============================================================
-
-export async function fetchAllNuclei(userId: string): Promise<Nuclei[]> {
-  const { data, error } = await supabase
-    .from('nuclei')
-    .select('*')
-    .order('created_at');
-  if (error) throw error;
-  return (data || []).map(dbToNuclei);
-}
-
-export async function insertNucleus(userId: string, n: Nuclei): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('nuclei')
-      .insert([nucleiToDb(n, userId)]);
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error inserting nucleus:', error);
-    return false;
-  }
-}
-
-export async function updateNucleus(userId: string, id: string, updates: Partial<Nuclei>): Promise<boolean> {
-  try {
-    const dbUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
-    if (updates.name !== undefined) dbUpdates.name = updates.name;
-    if (updates.status !== undefined) dbUpdates.status = updates.status;
-    if (updates.queenId !== undefined) dbUpdates.queen_id = updates.queenId || null;
-    if (updates.frameCount !== undefined) dbUpdates.frame_count = updates.frameCount;
-    if (updates.strength !== undefined) dbUpdates.strength = updates.strength;
-    if (updates.createdDate !== undefined) dbUpdates.created_date = updates.createdDate.toISOString();
-    if (updates.readyDate !== undefined) dbUpdates.ready_date = updates.readyDate ? updates.readyDate.toISOString() : null;
-    if (updates.price !== undefined) dbUpdates.price = updates.price ?? null;
-    if (updates.notes !== undefined) dbUpdates.notes = updates.notes || null;
-
-    const { error } = await supabase
-      .from('nuclei')
-      .update(dbUpdates)
-      .eq('id', id);
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error updating nucleus:', error);
-    return false;
-  }
-}
-
-export async function deleteNucleus(userId: string, id: string): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('nuclei')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error deleting nucleus:', error);
-    return false;
-  }
-}
-
-// ============================================================
 // SALES (one-level nesting: sale → items)
 // ============================================================
 
@@ -611,21 +560,15 @@ export async function fetchAllSales(userId: string): Promise<Sale[]> {
     supabase.from('sales').select('*').order('sale_date', { ascending: false }),
     supabase.from('sale_items').select('*'),
   ]);
-  if (salesRes.error) throw salesRes.error;
+  const firstError = salesRes.error || itemsRes.error;
+  if (firstError) throw firstError;
 
   const sales = (salesRes.data || []) as DbSale[];
   const items = (itemsRes.data || []) as DbSaleItem[];
 
-  const itemsBySale = groupBy(items.map(dbToSaleItem), 'id');
-  // Regroup by sale_id using raw items
-  const itemsBySaleId: Record<string, SaleItem[]> = {};
-  for (const item of items) {
-    const saleId = item.sale_id;
-    if (!itemsBySaleId[saleId]) itemsBySaleId[saleId] = [];
-    itemsBySaleId[saleId].push(dbToSaleItem(item));
-  }
+  const itemsBySaleId = groupBy(items, 'sale_id');
 
-  return sales.map(s => dbToSale(s, itemsBySaleId[s.id] || []));
+  return sales.map(s => dbToSale(s, (itemsBySaleId[s.id] || []).map(dbToSaleItem)));
 }
 
 export async function insertSale(userId: string, sale: Sale): Promise<boolean> {
@@ -810,22 +753,85 @@ export async function deleteIncome(userId: string, id: string): Promise<boolean>
 }
 
 // ============================================================
+// NOTES (flat entity — bilješke)
+// ============================================================
+
+export async function fetchAllNotes(userId: string): Promise<Note[]> {
+  const { data, error } = await supabase
+    .from('notes')
+    .select('*')
+    .order('date', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(dbToNote);
+}
+
+export async function insertNote(userId: string, note: Note): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('notes')
+      .insert([noteToDb(note, userId)]);
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error inserting note:', error);
+    return false;
+  }
+}
+
+export async function updateNote(userId: string, id: string, updates: Partial<Note>): Promise<boolean> {
+  try {
+    const dbUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
+    if (updates.title !== undefined) dbUpdates.title = updates.title;
+    if (updates.content !== undefined) dbUpdates.content = updates.content;
+    if (updates.date !== undefined) dbUpdates.date = updates.date.toISOString();
+
+    const { error } = await supabase
+      .from('notes')
+      .update(dbUpdates)
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating note:', error);
+    return false;
+  }
+}
+
+export async function deleteNote(userId: string, id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('notes')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting note:', error);
+    return false;
+  }
+}
+
+// ============================================================
 // BULK DELETE (for clearAllData)
 // ============================================================
 
 export async function deleteAllUserData(userId: string): Promise<boolean> {
   try {
     // Delete from parent tables — CASCADE handles children
-    // Note: deletes ALL shared data, not just the caller's
-    await Promise.all([
+    // WARNING: With shared RLS policies (using: true), this deletes ALL data for all users
+    const results = await Promise.all([
       supabase.from('locations').delete().neq('id', ''),
       supabase.from('queens').delete().neq('id', ''),
       supabase.from('queen_box_rows').delete().neq('id', ''),
-      supabase.from('nuclei').delete().neq('id', ''),
       supabase.from('sales').delete().neq('id', ''),
       supabase.from('expenses').delete().neq('id', ''),
       supabase.from('incomes').delete().neq('id', ''),
+      supabase.from('notes').delete().neq('id', ''),
     ]);
+
+    const firstError = results.find(r => r.error)?.error;
+    if (firstError) throw firstError;
+
     return true;
   } catch (error) {
     console.error('Error deleting all user data:', error);

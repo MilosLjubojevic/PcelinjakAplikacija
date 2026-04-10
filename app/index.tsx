@@ -2,7 +2,6 @@ import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +11,8 @@ import {
 import { useApp } from "../context/AppContext";
 import { formatCurrencyShort } from "../utils/currency";
 import WeatherWidget from "../components/WeatherWidget";
+import { DashboardSkeleton } from "../components/SkeletonLoader";
+import Button from "../components/Button";
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from "../constants/designTokens";
 
 // ─── Sub-Components ─────────────────────────────────────────────
@@ -168,7 +169,7 @@ function FinancialSnapshot({ salesThisMonth, onPress }: FinancialSnapshotProps) 
           <Ionicons name="trending-up" size={20} color={COLORS.success} />
         </View>
         <View style={styles.financeText}>
-          <Text style={styles.financeLabel}>Prodaja ovog meseca</Text>
+          <Text style={styles.financeLabel}>Prodaja ovog mjeseca</Text>
           <Text style={styles.financeValue}>
             {formatCurrencyShort(salesThisMonth)}
           </Text>
@@ -182,14 +183,23 @@ function FinancialSnapshot({ salesThisMonth, onPress }: FinancialSnapshotProps) 
 // ─── Main Screen ────────────────────────────────────────────────
 
 export default function HomeScreen() {
-  const { state, loading, metrics } = useApp();
+  const { state, loading, error, metrics, refreshData } = useApp();
   const router = useRouter();
 
   if (loading) {
     return (
+      <View style={styles.container}>
+        <DashboardSkeleton />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Učitavanje...</Text>
+        <Ionicons name="alert-circle" size={48} color={COLORS.danger} />
+        <Text style={styles.errorText}>{error}</Text>
+        <Button title="Pokušaj ponovo" onPress={refreshData} style={{ marginTop: SPACING.md }} />
       </View>
     );
   }
@@ -239,17 +249,17 @@ export default function HomeScreen() {
           icon="cube"
           value={metrics.totalNuclei}
           label="Rojevi"
-          iconColor={COLORS.accent.nuclei}
-          iconBg={COLORS.accent.nucleiLight}
-          onPress={() => router.push("/nuclei")}
+          iconColor={COLORS.accent.swarm}
+          iconBg={COLORS.accent.swarmLight}
+          onPress={() => router.push("/hive")}
         />
         <StatCard
           icon="pricetag"
           value={metrics.nucleiForSale}
-          label="Za prodaju"
+          label="Spremni"
           iconColor={COLORS.accent.sale}
           iconBg={COLORS.accent.saleLight}
-          onPress={() => router.push("/nuclei")}
+          onPress={() => router.push("/hive")}
         />
       </View>
 
@@ -287,9 +297,9 @@ export default function HomeScreen() {
         <QuickActionCard
           icon="cube"
           label="Rojevi"
-          color={COLORS.accent.nuclei}
-          bgColor={COLORS.accent.nucleiLight}
-          onPress={() => router.push("/nuclei")}
+          color={COLORS.accent.swarm}
+          bgColor={COLORS.accent.swarmLight}
+          onPress={() => router.push("/hive")}
         />
         <QuickActionCard
           icon="wallet"
@@ -334,6 +344,12 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
     fontSize: FONT_SIZE.md,
     color: COLORS.textSecondary,
+  },
+  errorText: {
+    fontSize: FONT_SIZE.lg,
+    color: COLORS.danger,
+    textAlign: "center",
+    marginTop: SPACING.md,
   },
 
   // ── Greeting ───────────────────────────────────────
@@ -466,7 +482,7 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   financeText: {
-    gap: 2,
+    gap: SPACING.xs,
   },
   financeLabel: {
     fontSize: FONT_SIZE.sm,
@@ -486,7 +502,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   quickAction: {
-    width: "48%",
     flexGrow: 1,
     flexBasis: "45%",
     backgroundColor: COLORS.surface,

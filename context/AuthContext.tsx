@@ -1,6 +1,6 @@
 import { Session, User } from "@supabase/supabase-js";
-import { makeRedirectUri } from "expo-auth-session";
 import * as QueryParams from "expo-auth-session/build/QueryParams";
+import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import React, {
   createContext,
@@ -150,10 +150,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signInWithGoogle = async () => {
-    const redirectUri = makeRedirectUri({
-      path: "google-auth",
+  // Deep-link fallback for Android: Chrome Custom Tabs don't always return
+  // the redirect URL to openAuthSessionAsync, so the OS opens the app directly.
+  useEffect(() => {
+    // App already open — catch incoming deep link
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      if (url.includes("google-auth")) {
+        console.log("[AUTH] Linking event url:", url);
+        createSessionFromUrl(url).catch((e) =>
+          console.log("[AUTH] Linking event error:", e?.message)
+        );
+      }
     });
+
+    // App was cold-started by a deep link
+    Linking.getInitialURL().then((url) => {
+      if (url && url.includes("google-auth")) {
+        console.log("[AUTH] initial URL:", url);
+        createSessionFromUrl(url).catch((e) =>
+          console.log("[AUTH] initial URL error:", e?.message)
+        );
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  const signInWithGoogle = async () => {
+    // No leading slash — Linking.createURL("google-auth") → pcelinjakaplikacija://google-auth
+    // A leading slash produces three slashes (pcelinjakaplikacija:///google-auth) which
+    // may not match Supabase's pcelinjakaplikacija://** pattern.
+    const redirectUri = Linking.createURL("google-auth");
     console.log("[AUTH] signInWithGoogle - redirectUri=", redirectUri);
 
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -161,6 +188,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       options: {
         redirectTo: redirectUri,
         skipBrowserRedirect: true,
+        queryParams: {
+          // Force Google to show account picker — prevents Chrome from silently
+          // reusing a cached session that has the website's redirect_to baked in.
+          prompt: "select_account",
+        },
       },
     });
 
@@ -169,15 +201,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw error;
     }
     console.log("[AUTH] signInWithOAuth success, opening browser...");
+    console.log("[AUTH] data.url=", data.url);
 
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
     console.log("[AUTH] browser result:", result.type);
 
     if (result.type === "success" && result.url) {
+      // iOS path: ASWebAuthenticationSession intercepted the redirect
       console.log("[AUTH] browser returned URL:", result.url);
       await createSessionFromUrl(result.url);
     } else {
       console.log("[AUTH] browser dismissed or failed, type=", result.type);
+      // Android path: redirect was handled as a deep link via the Linking listener above
     }
   };
 

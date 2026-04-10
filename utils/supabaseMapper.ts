@@ -1,11 +1,11 @@
 import {
-  Location, HiveRow, Hive, HiveNote, HiveHealth,
+  Location, HiveRow, Hive, HiveNote, HiveHealth, HiveType, SwarmStatus,
   Queen, QueenBreed, QueenStatus,
-  QueenBoxRow, QueenBox, QueenBoxHealth, QueenBoxStatus, QueenBoxLocation,
-  Nuclei, NucleiStatus,
+  QueenBoxRow, QueenBox, QueenBoxHealth, QueenBoxStatus,
   Sale, SaleItem, SaleStatus, SaleItemType,
   Expense, ExpenseCategory,
   Income, IncomeCategory,
+  Note,
 } from '../types';
 
 // ============================================================
@@ -27,6 +27,7 @@ export interface DbHiveRow {
   user_id: string;
   location_id: string;
   name: string;
+  capacity: number;
   order: number;
   created_at: string;
   updated_at: string;
@@ -38,8 +39,9 @@ export interface DbHive {
   location_id: string;
   row_id: string;
   number: number;
+  type: string;
   health: string;
-  has_queen: boolean;
+  has_queen: boolean | null;
   queen_id: string | null;
   last_inspection: string | null;
   frame_count: number | null;
@@ -48,6 +50,8 @@ export interface DbHive {
   is_active: boolean | null;
   last_feeding_date: string | null;
   last_harvest_date: string | null;
+  swarm_status: string | null;
+  swarm_start_date: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -91,7 +95,8 @@ export interface DbQueenBoxRow {
   id: string;
   user_id: string;
   name: string;
-  location: string;
+  location_id: string;
+  capacity: number;
   order: number;
   created_at: string;
   updated_at: string;
@@ -107,22 +112,6 @@ export interface DbQueenBox {
   start_date: string | null;
   maturity_date: string | null;
   removal_date: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DbNuclei {
-  id: string;
-  user_id: string;
-  name: string;
-  status: string;
-  queen_id: string | null;
-  frame_count: number;
-  strength: number;
-  created_date: string;
-  ready_date: string | null;
-  price: number | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -180,6 +169,16 @@ export interface DbIncome {
   updated_at: string;
 }
 
+export interface DbNote {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  date: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // ============================================================
 // Helpers
 // ============================================================
@@ -230,6 +229,7 @@ export function hiveRowToDb(row: HiveRow, userId: string): Omit<DbHiveRow, 'crea
     user_id: userId,
     location_id: row.locationId,
     name: row.name,
+    capacity: row.capacity,
     order: row.order,
   };
 }
@@ -239,6 +239,7 @@ export function dbToHiveRow(db: DbHiveRow, hives: Hive[]): HiveRow {
     id: db.id,
     name: db.name,
     locationId: db.location_id,
+    capacity: db.capacity ?? 10,
     hives,
     order: db.order,
     createdAt: toDateRequired(db.created_at),
@@ -257,16 +258,19 @@ export function hiveToDb(hive: Hive, userId: string): Omit<DbHive, 'created_at' 
     location_id: hive.locationId,
     row_id: hive.rowId,
     number: hive.number,
+    type: hive.type,
     health: hive.health,
-    has_queen: hive.hasQueen,
+    has_queen: hive.type === 'swarm' ? null : (hive.hasQueen ?? true),
     queen_id: hive.queenId || null,
     last_inspection: toIso(hive.lastInspection),
-    frame_count: hive.frameCount ?? 10,
-    is_harvested: hive.isHarvested ?? false,
-    has_pollen: hive.hasPollen ?? false,
-    is_active: (hive as any).isActive ?? true,
+    frame_count: hive.type === 'swarm' ? null : (hive.frameCount ?? 10),
+    is_harvested: hive.type === 'swarm' ? null : (hive.isHarvested ?? false),
+    has_pollen: hive.type === 'swarm' ? null : (hive.hasPollen ?? false),
+    is_active: hive.isActive ?? true,
     last_feeding_date: toIso(hive.lastFeedingDate),
     last_harvest_date: toIso(hive.lastHarvestDate),
+    swarm_status: hive.swarmStatus || null,
+    swarm_start_date: toIso(hive.swarmStartDate),
   };
 }
 
@@ -276,23 +280,28 @@ export function dbToHive(
   feedingDates: Date[],
   harvestDates: Date[],
 ): Hive {
+  const hiveType = (db.type || 'hive') as HiveType;
   return {
     id: db.id,
     number: db.number,
     locationId: db.location_id,
     rowId: db.row_id,
+    type: hiveType,
     health: db.health as HiveHealth,
-    hasQueen: db.has_queen,
+    hasQueen: db.has_queen ?? undefined,
     queenId: db.queen_id || undefined,
     lastInspection: toDate(db.last_inspection),
     notes: notes.length > 0 ? notes : undefined,
-    frameCount: db.frame_count ?? 10,
-    isHarvested: db.is_harvested ?? false,
-    hasPollen: db.has_pollen ?? false,
+    frameCount: db.frame_count ?? (hiveType === 'hive' ? 10 : undefined),
+    isHarvested: db.is_harvested ?? (hiveType === 'hive' ? false : undefined),
+    hasPollen: db.has_pollen ?? (hiveType === 'hive' ? false : undefined),
+    isActive: db.is_active ?? true,
     lastFeedingDate: feedingDates.length > 0 ? feedingDates[feedingDates.length - 1] : undefined,
     feedingDates: feedingDates.length > 0 ? feedingDates : undefined,
     lastHarvestDate: harvestDates.length > 0 ? harvestDates[harvestDates.length - 1] : undefined,
     harvestDates: harvestDates.length > 0 ? harvestDates : undefined,
+    swarmStatus: (db.swarm_status as SwarmStatus) || undefined,
+    swarmStartDate: toDate(db.swarm_start_date),
     createdAt: toDateRequired(db.created_at),
     updatedAt: toDateRequired(db.updated_at),
   };
@@ -371,7 +380,8 @@ export function queenBoxRowToDb(row: QueenBoxRow, userId: string): Omit<DbQueenB
     id: row.id,
     user_id: userId,
     name: row.name,
-    location: row.location,
+    location_id: row.locationId,
+    capacity: row.capacity,
     order: row.order,
   };
 }
@@ -380,7 +390,8 @@ export function dbToQueenBoxRow(db: DbQueenBoxRow, boxes: QueenBox[]): QueenBoxR
   return {
     id: db.id,
     name: db.name,
-    location: db.location as QueenBoxLocation,
+    locationId: db.location_id,
+    capacity: db.capacity ?? 10,
     queenBoxes: boxes,
     order: db.order,
     createdAt: toDateRequired(db.created_at),
@@ -436,43 +447,6 @@ export function dbToQueenBox(db: DbQueenBox): QueenBox {
     removalDate,
     daysUntilMature,
     daysSinceRemoval,
-    notes: db.notes || undefined,
-    createdAt: toDateRequired(db.created_at),
-    updatedAt: toDateRequired(db.updated_at),
-  };
-}
-
-// ============================================================
-// Nuclei mappers
-// ============================================================
-
-export function nucleiToDb(n: Nuclei, userId: string): Omit<DbNuclei, 'created_at' | 'updated_at'> {
-  return {
-    id: n.id,
-    user_id: userId,
-    name: n.name,
-    status: n.status,
-    queen_id: n.queenId || null,
-    frame_count: n.frameCount,
-    strength: n.strength,
-    created_date: toIsoRequired(n.createdDate),
-    ready_date: toIso(n.readyDate),
-    price: n.price ?? null,
-    notes: n.notes || null,
-  };
-}
-
-export function dbToNuclei(db: DbNuclei): Nuclei {
-  return {
-    id: db.id,
-    name: db.name,
-    status: db.status as NucleiStatus,
-    queenId: db.queen_id || undefined,
-    frameCount: db.frame_count,
-    strength: db.strength,
-    createdDate: toDateRequired(db.created_date),
-    readyDate: toDate(db.ready_date),
-    price: db.price ?? undefined,
     notes: db.notes || undefined,
     createdAt: toDateRequired(db.created_at),
     updatedAt: toDateRequired(db.updated_at),
@@ -600,6 +574,31 @@ export function dbToIncome(db: DbIncome): Income {
 }
 
 // ============================================================
+// Note mappers
+// ============================================================
+
+export function noteToDb(note: Note, userId: string): Omit<DbNote, 'created_at' | 'updated_at'> {
+  return {
+    id: note.id,
+    user_id: userId,
+    title: note.title,
+    content: note.content,
+    date: toIsoRequired(note.date),
+  };
+}
+
+export function dbToNote(db: DbNote): Note {
+  return {
+    id: db.id,
+    title: db.title,
+    content: db.content,
+    date: toDateRequired(db.date),
+    createdAt: toDateRequired(db.created_at),
+    updatedAt: toDateRequired(db.updated_at),
+  };
+}
+
+// ============================================================
 // Utility: groupBy helper
 // ============================================================
 
@@ -611,4 +610,15 @@ export function groupBy<T>(items: T[], key: keyof T): Record<string, T[]> {
     result[k].push(item);
   }
   return result;
+}
+
+/** Keep only the first item for each unique key (preserves input order). */
+export function deduplicateByKey<T>(items: T[], keyFn: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  return items.filter(item => {
+    const k = keyFn(item);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }

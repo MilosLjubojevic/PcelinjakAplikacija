@@ -50,7 +50,7 @@ export default function AdminScreen() {
     }
 
     if (allowedEmails.some((e) => e.email === trimmed)) {
-      setEmailError("Ovaj email vec postoji");
+      setEmailError("Ovaj email već postoji");
       return;
     }
 
@@ -63,23 +63,23 @@ export default function AdminScreen() {
       setEmailError("");
       setModalVisible(false);
     } else {
-      Alert.alert("Greska", "Nije moguce dodati email. Pokusajte ponovo.");
+      Alert.alert("Greška", "Nije moguće dodati email. Pokušajte ponovo.");
     }
   };
 
   const handleDelete = (id: number, email: string) => {
     Alert.alert(
       "Ukloni Email",
-      `Da li ste sigurni da zelite da uklonite "${email}"?\n\nOva osoba vise nece moci da se prijavi.`,
+      `Da li ste sigurni da želite da uklonite "${email}"?\n\nOva osoba više neće moći da se prijavi.`,
       [
-        { text: "Otkazi", style: "cancel" },
+        { text: "Otkaži", style: "cancel" },
         {
           text: "Ukloni",
           style: "destructive",
           onPress: async () => {
             const success = await deleteAllowedEmail(id);
             if (!success) {
-              Alert.alert("Greska", "Nije moguce ukloniti email.");
+              Alert.alert("Greška", "Nije moguće ukloniti email.");
             }
           },
         },
@@ -101,7 +101,7 @@ export default function AdminScreen() {
       <View style={styles.loadingContainer}>
         <Ionicons name="alert-circle" size={64} color={COLORS.danger} />
         <Text style={styles.errorText}>{allowedEmailsError}</Text>
-        <Button title="Pokusaj ponovo" onPress={fetchAllowedEmails} />
+        <Button title="Pokušaj ponovo" onPress={fetchAllowedEmails} />
       </View>
     );
   }
@@ -123,7 +123,7 @@ export default function AdminScreen() {
           <EmptyState
             icon="mail-outline"
             title="Nema email-ova"
-            message="Dodajte email adrese korisnika kojima zelite da omogucite pristup aplikaciji."
+            message="Dodajte email adrese korisnika kojima želite da omogućite pristup aplikaciji."
             actionLabel="Dodaj Email"
             onAction={() => setModalVisible(true)}
           />
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: SPACING.lg,
     paddingTop: SPACING.sm,
-    paddingBottom: 100,
+    paddingBottom: 80,
   },
   emailCard: {
     marginBottom: SPACING.md,
