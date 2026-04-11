@@ -6,6 +6,7 @@ import {
   DrawerItem,
 } from "@react-navigation/drawer";
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { useAuth } from "../context/AuthContext";
 import { COLORS, SPACING, FONT_SIZE } from "../constants/designTokens";
 
@@ -31,6 +32,9 @@ export default function CustomDrawerContent(props: any) {
           onPress={signOut}
           labelStyle={styles.signOutLabel}
         />
+        <Text style={styles.versionText}>
+          v{Constants.expoConfig?.version ?? "1.0.0"}
+        </Text>
       </View>
     </View>
   );
@@ -54,5 +58,11 @@ const styles = StyleSheet.create({
   signOutLabel: {
     color: COLORS.danger,
     fontWeight: "600",
+  },
+  versionText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    textAlign: "center",
+    paddingBottom: SPACING.sm,
   },
 });

@@ -13,7 +13,6 @@ import {
 import Button from "../components/Button";
 import DatePicker from "../components/DatePicker";
 import Input from "../components/Input";
-import InspectionPhotoPicker from "../components/InspectionPhotoPicker";
 import Modal from "../components/Modal";
 import Picker, { PickerOption } from "../components/Picker";
 import SearchBar from "../components/SearchBar";
@@ -61,7 +60,6 @@ export default function HivesScreen() {
     hasQueen: boolean;
     queenId: string;
     newNote: string;
-    notePhotos: string[];
     lastInspection: Date | null;
     frameCount: string;
     isHarvested: boolean;
@@ -75,7 +73,6 @@ export default function HivesScreen() {
     hasQueen: true,
     queenId: "",
     newNote: "",
-    notePhotos: [],
     lastInspection: null,
     frameCount: "10",
     isHarvested: false,
@@ -121,7 +118,6 @@ export default function HivesScreen() {
       hasQueen: true,
       queenId: "",
       newNote: "",
-      notePhotos: [],
       lastInspection: null,
       frameCount: "10",
       isHarvested: false,
@@ -156,7 +152,6 @@ export default function HivesScreen() {
         hasQueen: hive.hasQueen ?? true,
         queenId: hive.queenId || "",
         newNote: "",
-        notePhotos: [],
         lastInspection: hive.lastInspection ? new Date(hive.lastInspection) : null,
         frameCount: hive.frameCount?.toString() || "10",
         isHarvested: hive.isHarvested || false,
@@ -175,7 +170,6 @@ export default function HivesScreen() {
     const newNote: HiveNote = {
       id: Crypto.randomUUID(),
       text: hiveFormData.newNote.trim(),
-      photos: hiveFormData.notePhotos.length > 0 ? hiveFormData.notePhotos : undefined,
       createdAt: new Date(),
     };
 
@@ -194,7 +188,7 @@ export default function HivesScreen() {
 
       updateLocation(currentLocation.id, { rows: updatedRows });
       setEditingHive(updatedHive);
-      setHiveFormData({ ...hiveFormData, newNote: "", notePhotos: [] });
+      setHiveFormData({ ...hiveFormData, newNote: "" });
     }
   };
 
@@ -571,6 +565,7 @@ export default function HivesScreen() {
       {/* Rows List */}
       <ScrollView
         style={styles.scrollView}
+        contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
         {displayRows.map((row) => {
@@ -795,7 +790,7 @@ export default function HivesScreen() {
           resetHiveForm();
         }}
         title={`Košnica ${editingHive?.number || ""}`}
-        hasUnsavedChanges={hiveFormData.newNote.trim() !== '' || hiveFormData.notePhotos.length > 0}
+        hasUnsavedChanges={hiveFormData.newNote.trim() !== ''}
       >
         {/* Type Switcher */}
         <View style={styles.typeSwitcherContainer}>
@@ -1109,22 +1104,8 @@ export default function HivesScreen() {
                 <View key={note.id} style={styles.noteItem}>
                   <View style={styles.noteContent}>
                     <Text style={styles.noteText}>{note.text}</Text>
-                    {note.photos && note.photos.length > 0 && (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: SPACING.sm }}>
-                        {note.photos.map((uri, i) => (
-                          <View key={`${note.id}-photo-${i}`} style={{ marginRight: SPACING.sm }}>
-                            <View style={{ width: 60, height: 60, borderRadius: RADIUS.sm, overflow: 'hidden' }}>
-                              <View style={{ width: 60, height: 60, backgroundColor: COLORS.border, alignItems: 'center', justifyContent: 'center' }}>
-                                <Ionicons name="image" size={24} color={COLORS.textMuted} />
-                              </View>
-                            </View>
-                          </View>
-                        ))}
-                      </ScrollView>
-                    )}
                     <Text style={styles.noteDate}>
                       {formatDate(note.createdAt)}
-                      {note.photos && note.photos.length > 0 ? ` • ${note.photos.length} foto` : ''}
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -1149,13 +1130,6 @@ export default function HivesScreen() {
               multiline
               numberOfLines={3}
               containerStyle={{ flex: 1, marginBottom: 0 }}
-            />
-            <InspectionPhotoPicker
-              photos={hiveFormData.notePhotos}
-              onPhotosChange={(photos) =>
-                setHiveFormData({ ...hiveFormData, notePhotos: photos })
-              }
-              maxPhotos={5}
             />
             <Button
               title="Dodaj"
@@ -1256,7 +1230,6 @@ export default function HivesScreen() {
                 hasQueen: true,
                 queenId: "",
                 newNote: "",
-                notePhotos: [],
                 lastInspection: null,
                 frameCount: "10",
                 isHarvested: false,

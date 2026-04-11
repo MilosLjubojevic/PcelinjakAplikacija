@@ -534,7 +534,7 @@ export default function QueensScreen() {
 
       <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Pretraži redove/oplodnjake..." />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
         {searchedRows.length === 0 ? (
           <EmptyState
             icon="star-outline"
@@ -682,7 +682,6 @@ export default function QueensScreen() {
             );
           })
         )}
-        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* Add Button */}
