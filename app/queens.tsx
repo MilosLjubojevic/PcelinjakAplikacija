@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -21,6 +21,7 @@ import EmptyState from "../components/EmptyState";
 import SearchBar from "../components/SearchBar";
 import DatePicker from "../components/DatePicker";
 import { GridSkeleton } from "../components/SkeletonLoader";
+import { DraggableRowList } from "../components/DraggableRowList";
 import { formatDate } from "../utils/dateUtils";
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from "../constants/designTokens";
 
@@ -445,6 +446,22 @@ export default function QueensScreen() {
 
   const [editModeRows, setEditModeRows] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isDraggingRows, setIsDraggingRows] = useState(false);
+
+  const handleRowsReorder = useCallback(async (reorderedRows: QueenBoxRow[]) => {
+    try {
+      await Promise.all(
+        reorderedRows.map((row, i) => {
+          if (row.order !== i) return updateQueenBoxRow(row.id, { order: i });
+          return Promise.resolve();
+        })
+      );
+    } catch (error) {
+      console.error("Failed to reorder queen box rows:", error);
+      showToast("Neuspješno preuređivanje redova. Podaci su osvježeni.", "error");
+      await refreshData();
+    }
+  }, [refreshData, showToast, updateQueenBoxRow]);
 
   if (loading) {
     return (
@@ -455,7 +472,6 @@ export default function QueensScreen() {
   }
 
   const selectedLocation = state.locations.find((l) => l.id === selectedLocationId);
-  const locationStats = selectedLocation ? getLocationStats(selectedLocationId) : null;
 
   // Filter rows by search query
   const searchedRows = searchQuery
@@ -558,7 +574,7 @@ export default function QueensScreen() {
 
       <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Pretraži redove/oplodnjake..." />
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false} scrollEnabled={!isDraggingRows}>
         {searchedRows.length === 0 ? (
           <EmptyState
             icon="star-outline"
@@ -568,12 +584,18 @@ export default function QueensScreen() {
             onAction={searchQuery ? undefined : openAddModal}
           />
         ) : (
-          searchedRows.map((row) => {
+          <DraggableRowList
+            rows={searchedRows}
+            disabled={!!searchQuery}
+            onReorder={handleRowsReorder}
+            onDragStart={() => setIsDraggingRows(true)}
+            onDragEnd={() => setIsDraggingRows(false)}
+            renderRow={(row) => {
             const isExpanded = expandedRows.includes(row.id);
             const stats = getRowStats(row);
 
             return (
-              <View key={row.id} style={styles.rowContainer}>
+              <View style={styles.rowContainer}>
                 {/* Row Header */}
                 <TouchableOpacity
                   style={styles.rowHeader}
@@ -743,7 +765,8 @@ export default function QueensScreen() {
                 )}
               </View>
             );
-          })
+            }}
+          />
         )}
       </ScrollView>
 
@@ -1191,6 +1214,7 @@ const styles = StyleSheet.create({
   },
   queenBox: {
     borderWidth: 3,
+    borderStyle: "solid",
     backgroundColor: COLORS.background,
     alignItems: "center",
     justifyContent: "center",

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -17,6 +17,7 @@ import Modal from "../components/Modal";
 import Picker, { PickerOption } from "../components/Picker";
 import SearchBar from "../components/SearchBar";
 import { GridSkeleton } from "../components/SkeletonLoader";
+import { DraggableRowList } from "../components/DraggableRowList";
 import { useApp } from "../context/AppContext";
 import { Hive, HiveHealth, HiveNote, HiveRow, HiveType, SwarmStatus } from "../types";
 import { formatDate } from "../utils/dateUtils";
@@ -454,7 +455,16 @@ export default function HivesScreen() {
       case "empty": return COLORS.textMuted;
       case "developing": return COLORS.primary;
       case "ready": return COLORS.success;
-      case "natural": return COLORS.accent.swarm;
+      case "natural": return COLORS.info;
+    }
+  };
+
+  const getSwarmStatusBg = (status: SwarmStatus) => {
+    switch (status) {
+      case "empty": return COLORS.accent.swarmLight;
+      case "developing": return COLORS.accent.hiveLight;
+      case "ready": return COLORS.successLight;
+      case "natural": return COLORS.infoLight;
     }
   };
 
@@ -485,6 +495,13 @@ export default function HivesScreen() {
   };
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [isDraggingRows, setIsDraggingRows] = useState(false);
+
+  const handleRowsReorder = useCallback(async (reorderedRows: HiveRow[]) => {
+    if (!currentLocation) return;
+    const withOrder = reorderedRows.map((row, i) => ({ ...row, order: i }));
+    await updateLocation(currentLocation.id, { rows: withOrder });
+  }, [currentLocation, updateLocation]);
 
   if (loading) {
     return (
@@ -594,13 +611,20 @@ export default function HivesScreen() {
         style={styles.scrollView}
         contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={!isDraggingRows}
       >
-        {displayRows.map((row) => {
+        <DraggableRowList
+          rows={displayRows}
+          disabled={!!searchQuery}
+          onReorder={handleRowsReorder}
+          onDragStart={() => setIsDraggingRows(true)}
+          onDragEnd={() => setIsDraggingRows(false)}
+          renderRow={(row) => {
           const isExpanded = expandedRows.includes(row.id);
           const stats = getRowStats(row);
 
           return (
-            <View key={row.id} style={styles.rowContainer}>
+            <View style={styles.rowContainer}>
               {/* Row Header */}
               <TouchableOpacity
                 style={styles.rowHeader}
@@ -673,6 +697,7 @@ export default function HivesScreen() {
                             { width: hiveBoxSize, height: hiveBoxSize, borderRadius: hiveBoxSize * 0.16 },
                             { borderColor: getHealthColor(hive.health) },
                             isSwarm && styles.swarmBox,
+                            isSwarm && { backgroundColor: getSwarmStatusBg(hive.swarmStatus || 'empty') },
                             isInactive && styles.hiveBoxInactive,
                           ]}
                           onPress={() => openEditHiveModal(hive, row.id)}
@@ -684,7 +709,7 @@ export default function HivesScreen() {
                             style={[
                               styles.hiveNumber,
                               isInactive && styles.hiveNumberInactive,
-                              isSwarm && { color: COLORS.accent.swarm },
+                              isSwarm && { color: getSwarmStatusColor(hive.swarmStatus || 'empty') },
                             ]}
                             allowFontScaling={false}
                           >
@@ -758,7 +783,8 @@ export default function HivesScreen() {
               )}
             </View>
           );
-        })}
+          }}
+        />
       </ScrollView>
 
       {/* Add Button */}
