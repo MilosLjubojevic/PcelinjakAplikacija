@@ -53,7 +53,7 @@ export interface OrderWithItems extends Order {
 // Hive-related types
 export type HiveHealth = "good" | "bad" | "warning";
 export type HiveType = "hive" | "swarm";
-export type SwarmStatus = "empty" | "developing" | "ready";
+export type SwarmStatus = "empty" | "developing" | "ready" | "natural";
 
 export interface HiveNote {
   id: string;

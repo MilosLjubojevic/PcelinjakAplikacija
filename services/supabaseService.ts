@@ -438,7 +438,7 @@ export async function deleteQueen(userId: string, id: string): Promise<boolean> 
 export async function fetchAllQueenBoxRows(userId: string): Promise<QueenBoxRow[]> {
   const [rowsRes, boxesRes] = await Promise.all([
     supabase.from('queen_box_rows').select('*').order('order'),
-    supabase.from('queen_boxes').select('*').order('number'),
+    supabase.from('queen_boxes').select('*').order('created_at'),
   ]);
   const firstError = rowsRes.error || boxesRes.error;
   if (firstError) throw firstError;

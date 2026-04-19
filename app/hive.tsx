@@ -54,6 +54,9 @@ export default function HivesScreen() {
     rowName: "",
     capacity: "",
   });
+  const [editRowModalVisible, setEditRowModalVisible] = useState(false);
+  const [editingRow, setEditingRow] = useState<HiveRow | null>(null);
+  const [editRowFormData, setEditRowFormData] = useState({ rowName: "", capacity: "" });
   const [hiveFormData, setHiveFormData] = useState<{
     hiveNumber: string;
     health: string;
@@ -373,6 +376,28 @@ export default function HivesScreen() {
     setEditingHive(null);
   };
 
+  const handleOpenEditRow = (row: HiveRow) => {
+    setEditingRow(row);
+    setEditRowFormData({ rowName: row.name, capacity: row.capacity.toString() });
+    setEditRowModalVisible(true);
+  };
+
+  const handleSaveRow = async () => {
+    if (!currentLocation || !editingRow) return;
+    const capacity = parseInt(editRowFormData.capacity);
+    if (isNaN(capacity) || capacity <= 0) return;
+    setSaving(true);
+    const updatedRows = currentLocation.rows.map((r) =>
+      r.id === editingRow.id
+        ? { ...r, name: editRowFormData.rowName, capacity, updatedAt: new Date() }
+        : r
+    );
+    await updateLocation(currentLocation.id, { rows: updatedRows });
+    setSaving(false);
+    setEditRowModalVisible(false);
+    setEditingRow(null);
+  };
+
   const handleDeleteRow = (rowId: string, rowName: string) => {
     if (!currentLocation) return;
 
@@ -420,6 +445,7 @@ export default function HivesScreen() {
       case "empty": return "Prazan";
       case "developing": return "Razvija se";
       case "ready": return "Spreman";
+      case "natural": return "Prirodni";
     }
   };
 
@@ -428,6 +454,7 @@ export default function HivesScreen() {
       case "empty": return COLORS.textMuted;
       case "developing": return COLORS.primary;
       case "ready": return COLORS.success;
+      case "natural": return COLORS.accent.swarm;
     }
   };
 
@@ -587,7 +614,7 @@ export default function HivesScreen() {
                   />
                   <Text style={styles.rowName}>{row.name}</Text>
                   <View style={styles.rowBadge}>
-                    <Text style={styles.rowBadgeText}>{stats.filled}/{stats.total}</Text>
+                    <Text style={styles.rowBadgeText} allowFontScaling={false}>{stats.filled}/{stats.total}</Text>
                   </View>
                 </View>
 
@@ -595,15 +622,15 @@ export default function HivesScreen() {
                 <View style={styles.quickStats}>
                   <View key="hives" style={styles.statDot}>
                     <Ionicons name="grid-outline" size={12} color={COLORS.accent.hive} />
-                    <Text style={styles.statNumber}>{stats.hives}</Text>
+                    <Text style={styles.statNumber} allowFontScaling={false}>{stats.hives}</Text>
                   </View>
                   <View key="swarms" style={styles.statDot}>
                     <Ionicons name="cube-outline" size={12} color={COLORS.accent.swarm} />
-                    <Text style={styles.statNumber}>{stats.swarms}</Text>
+                    <Text style={styles.statNumber} allowFontScaling={false}>{stats.swarms}</Text>
                   </View>
                   <View key="empty" style={styles.statDot}>
                     <View style={[styles.dot, { backgroundColor: COLORS.borderMedium }]} />
-                    <Text style={styles.statNumber}>{stats.empty}</Text>
+                    <Text style={styles.statNumber} allowFontScaling={false}>{stats.empty}</Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -629,7 +656,7 @@ export default function HivesScreen() {
                             accessibilityLabel={`Prazan slot ${slotNum}`}
                             accessibilityHint="Pritisni da dodaš košnicu ili roj"
                           >
-                            <Text style={styles.emptySlotNumber}>{slotNum}</Text>
+                            <Text style={styles.emptySlotNumber} allowFontScaling={false}>{slotNum}</Text>
                             <Ionicons name="add" size={FONT_SIZE.sm} color={COLORS.textMuted} />
                           </TouchableOpacity>
                         );
@@ -659,6 +686,7 @@ export default function HivesScreen() {
                               isInactive && styles.hiveNumberInactive,
                               isSwarm && { color: COLORS.accent.swarm },
                             ]}
+                            allowFontScaling={false}
                           >
                             {hive.number}
                           </Text>
@@ -707,6 +735,15 @@ export default function HivesScreen() {
 
                   {/* Row Actions */}
                   <View style={styles.rowActions}>
+                    <TouchableOpacity
+                      style={styles.rowActionButton}
+                      onPress={() => handleOpenEditRow(row)}
+                    >
+                      <Ionicons name="create-outline" size={SPACING.xl} color={COLORS.primary} />
+                      <Text style={[styles.rowActionText, { color: COLORS.primary }]}>
+                        Uredi red
+                      </Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.rowActionButton}
                       onPress={() => handleDeleteRow(row.id, row.name)}
@@ -1189,6 +1226,55 @@ export default function HivesScreen() {
         </View>
       </Modal>
 
+      {/* Edit Row Modal */}
+      <Modal
+        visible={editRowModalVisible}
+        onClose={() => {
+          setEditRowModalVisible(false);
+          setEditingRow(null);
+        }}
+        title="Uredi Red"
+        hasUnsavedChanges={
+          editingRow !== null &&
+          (editRowFormData.rowName !== editingRow.name ||
+            editRowFormData.capacity !== editingRow.capacity.toString())
+        }
+      >
+        <Input
+          label="Naziv reda"
+          value={editRowFormData.rowName}
+          onChangeText={(text) => setEditRowFormData({ ...editRowFormData, rowName: text })}
+          placeholder="Npr. Red 1, Red A..."
+        />
+
+        <Input
+          label="Broj mjesta (kapacitet)"
+          value={editRowFormData.capacity}
+          onChangeText={(text) => setEditRowFormData({ ...editRowFormData, capacity: text })}
+          placeholder="Npr. 30"
+          keyboardType="numeric"
+        />
+
+        <View style={styles.modalButtons}>
+          <Button
+            title="Otkaži"
+            onPress={() => {
+              setEditRowModalVisible(false);
+              setEditingRow(null);
+            }}
+            variant="secondary"
+            style={{ flex: 1, marginRight: SPACING.sm }}
+          />
+          <Button
+            title="Sačuvaj"
+            onPress={handleSaveRow}
+            disabled={!editRowFormData.rowName || !editRowFormData.capacity}
+            loading={saving}
+            style={{ flex: 1, marginLeft: SPACING.sm }}
+          />
+        </View>
+      </Modal>
+
       {/* Edit Swarm Modal */}
       <Modal
         visible={editSwarmModalVisible}
@@ -1272,6 +1358,7 @@ export default function HivesScreen() {
               { label: "Prazan", value: "empty" },
               { label: "Razvija se", value: "developing" },
               { label: "Spreman", value: "ready" },
+              { label: "Prirodni", value: "natural" },
             ]}
             onValueChange={(value) =>
               setSwarmFormData({ ...swarmFormData, swarmStatus: value as SwarmStatus })

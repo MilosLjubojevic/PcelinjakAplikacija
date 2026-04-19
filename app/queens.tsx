@@ -50,6 +50,9 @@ export default function QueensScreen() {
     locationId: state.locations[0]?.id || "",
   });
   const [saving, setSaving] = useState(false);
+  const [editRowModalVisible, setEditRowModalVisible] = useState(false);
+  const [editingRow, setEditingRow] = useState<QueenBoxRow | null>(null);
+  const [editRowFormData, setEditRowFormData] = useState({ rowName: "", capacity: "" });
   const [addBoxModalVisible, setAddBoxModalVisible] = useState(false);
   const [pendingSlotRowId, setPendingSlotRowId] = useState<string | null>(null);
   const [pendingSlotNumber, setPendingSlotNumber] = useState<number | null>(null);
@@ -206,8 +209,8 @@ export default function QueensScreen() {
     if (!pendingSlotRowId || pendingSlotNumber === null || saving) return;
 
     const num = parseInt(newBoxNumber);
-    if (isNaN(num) || num < 1 || num > 300) {
-      Alert.alert("Greška", "Unesite broj od 1 do 300.");
+    if (isNaN(num) || num < 1 || num > 999) {
+      Alert.alert("Greška", "Unesite broj od 1 do 999.");
       return;
     }
     if (usedBoxNumbers.has(num)) {
@@ -258,8 +261,8 @@ export default function QueensScreen() {
     const startDate = boxFormData.startDate || undefined;
     const newNumber = parseInt(boxFormData.displayNumber);
 
-    if (isNaN(newNumber) || newNumber < 1 || newNumber > 300) {
-      Alert.alert("Greška", "Unesite broj od 1 do 300.");
+    if (isNaN(newNumber) || newNumber < 1 || newNumber > 999) {
+      Alert.alert("Greška", "Unesite broj od 1 do 999.");
       setSaving(false);
       return;
     }
@@ -295,6 +298,26 @@ export default function QueensScreen() {
     setSaving(false);
     setEditBoxModalVisible(false);
     resetBoxForm();
+  };
+
+  const handleOpenEditRow = (row: QueenBoxRow) => {
+    setEditingRow(row);
+    setEditRowFormData({ rowName: row.name, capacity: row.capacity.toString() });
+    setEditRowModalVisible(true);
+  };
+
+  const handleSaveRow = async () => {
+    if (!editingRow) return;
+    const capacity = parseInt(editRowFormData.capacity);
+    if (isNaN(capacity) || capacity < 1 || capacity > 200) {
+      Alert.alert("Greška", "Unesite validan kapacitet (1-200).");
+      return;
+    }
+    setSaving(true);
+    await updateQueenBoxRow(editingRow.id, { name: editRowFormData.rowName, capacity });
+    setSaving(false);
+    setEditRowModalVisible(false);
+    setEditingRow(null);
   };
 
   const handleDeleteRow = (rowId: string, rowName: string) => {
@@ -420,6 +443,7 @@ export default function QueensScreen() {
     return { totalRows: rows.length, totalSlots, totalFilled, developing, mature };
   };
 
+  const [editModeRows, setEditModeRows] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
   if (loading) {
@@ -563,7 +587,7 @@ export default function QueensScreen() {
                     />
                     <Text style={styles.rowName}>{row.name}</Text>
                     <View style={styles.rowBadge}>
-                      <Text style={styles.rowBadgeText}>{stats.filled}/{stats.total}</Text>
+                      <Text style={styles.rowBadgeText} allowFontScaling={false}>{stats.filled}/{stats.total}</Text>
                     </View>
                   </View>
 
@@ -571,15 +595,15 @@ export default function QueensScreen() {
                   <View style={styles.quickStats}>
                     <View style={styles.statDot}>
                       <View style={[styles.dot, { backgroundColor: COLORS.borderMedium }]} />
-                      <Text style={styles.statNumber}>{stats.emptySlots}</Text>
+                      <Text style={styles.statNumber} allowFontScaling={false}>{stats.emptySlots}</Text>
                     </View>
                     <View style={styles.statDot}>
                       <View style={[styles.dot, { backgroundColor: COLORS.info }]} />
-                      <Text style={styles.statNumber}>{stats.developing}</Text>
+                      <Text style={styles.statNumber} allowFontScaling={false}>{stats.developing}</Text>
                     </View>
                     <View style={styles.statDot}>
                       <View style={[styles.dot, { backgroundColor: COLORS.success }]} />
-                      <Text style={styles.statNumber}>{stats.mature}</Text>
+                      <Text style={styles.statNumber} allowFontScaling={false}>{stats.mature}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -601,13 +625,18 @@ export default function QueensScreen() {
                               { borderColor: box.status === "mature" ? COLORS.success : getHealthColor(box.health) },
                               box.status === "empty" && styles.queenBoxEmpty,
                               box.status === "mature" && styles.queenBoxMature,
+                              editModeRows.includes(row.id) && styles.queenBoxEditMode,
                             ]}
-                            onPress={() => handleQuickStatusToggle(row.id, box)}
+                            onPress={() =>
+                              editModeRows.includes(row.id)
+                                ? openEditBoxModal(box, row.id)
+                                : handleQuickStatusToggle(row.id, box)
+                            }
                             onLongPress={() => openEditBoxModal(box, row.id)}
                             accessibilityLabel={`Oplodnjak ${box.number}, ${box.status === 'empty' ? 'prazan' : box.status === 'developing' ? 'u razvoju' : 'zreo'}`}
                             accessibilityHint="Pritisni za promjenu statusa, dugo drži za izmjenu"
                           >
-                            <Text style={styles.boxNumber}>{box.number}</Text>
+                            <Text style={styles.boxNumber} allowFontScaling={false}>{box.number}</Text>
 
                             {/* Status indicator with icon */}
                             <View
@@ -627,7 +656,7 @@ export default function QueensScreen() {
                             {/* Days counter */}
                             {daysUntilMature !== null && (
                               <View style={styles.daysCounter}>
-                                <Text style={styles.daysText}>{daysUntilMature}d</Text>
+                                <Text style={styles.daysText} allowFontScaling={false}>{daysUntilMature}d</Text>
                               </View>
                             )}
 
@@ -666,6 +695,40 @@ export default function QueensScreen() {
 
                     {/* Row Actions */}
                     <View style={styles.rowActions}>
+                      {editModeRows.includes(row.id) ? (
+                        <TouchableOpacity
+                          style={[styles.rowActionButton, styles.rowActionButtonSave]}
+                          onPress={() =>
+                            setEditModeRows((prev) => prev.filter((id) => id !== row.id))
+                          }
+                        >
+                          <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.surface} />
+                          <Text style={[styles.rowActionText, { color: COLORS.surface }]}>
+                            Sačuvaj
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.rowActionButton}
+                          onPress={() =>
+                            setEditModeRows((prev) => [...prev, row.id])
+                          }
+                        >
+                          <Ionicons name="pencil-outline" size={20} color={COLORS.info} />
+                          <Text style={[styles.rowActionText, { color: COLORS.info }]}>
+                            Izmjeni
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        style={styles.rowActionButton}
+                        onPress={() => handleOpenEditRow(row)}
+                      >
+                        <Ionicons name="create-outline" size={20} color={COLORS.primary} />
+                        <Text style={[styles.rowActionText, { color: COLORS.primary }]}>
+                          Uredi red
+                        </Text>
+                      </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.rowActionButton}
                         onPress={() => handleDeleteRow(row.id, row.name)}
@@ -688,6 +751,55 @@ export default function QueensScreen() {
       <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
         <Ionicons name="add" size={28} color={COLORS.surface} />
       </TouchableOpacity>
+
+      {/* Edit Row Modal */}
+      <Modal
+        visible={editRowModalVisible}
+        onClose={() => {
+          setEditRowModalVisible(false);
+          setEditingRow(null);
+        }}
+        title="Uredi Red"
+        hasUnsavedChanges={
+          editingRow !== null &&
+          (editRowFormData.rowName !== editingRow.name ||
+            editRowFormData.capacity !== editingRow.capacity.toString())
+        }
+      >
+        <Input
+          label="Naziv reda"
+          value={editRowFormData.rowName}
+          onChangeText={(text) => setEditRowFormData({ ...editRowFormData, rowName: text })}
+          placeholder="Npr. Red 1, Red A..."
+        />
+
+        <Input
+          label="Kapacitet (broj mjesta)"
+          value={editRowFormData.capacity}
+          onChangeText={(text) => setEditRowFormData({ ...editRowFormData, capacity: text })}
+          placeholder="Npr. 30"
+          keyboardType="numeric"
+        />
+
+        <View style={styles.modalButtons}>
+          <Button
+            title="Otkaži"
+            onPress={() => {
+              setEditRowModalVisible(false);
+              setEditingRow(null);
+            }}
+            variant="secondary"
+            style={{ flex: 1, marginRight: SPACING.sm }}
+          />
+          <Button
+            title="Sačuvaj"
+            onPress={handleSaveRow}
+            disabled={!editRowFormData.rowName || !editRowFormData.capacity}
+            loading={saving}
+            style={{ flex: 1, marginLeft: SPACING.sm }}
+          />
+        </View>
+      </Modal>
 
       {/* Add Row Modal */}
       <Modal
@@ -763,7 +875,7 @@ export default function QueensScreen() {
         title="Dodaj Oplodnjak"
       >
         <Input
-          label="Broj oplodnjaka (1-300)"
+          label="Broj oplodnjaka (1-999)"
           value={newBoxNumber}
           onChangeText={setNewBoxNumber}
           placeholder="Npr. 42"
@@ -1249,5 +1361,14 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     color: COLORS.danger,
     fontWeight: "500",
+  },
+  queenBoxEditMode: {
+    opacity: 0.85,
+    borderStyle: "dashed",
+  },
+  rowActionButtonSave: {
+    backgroundColor: COLORS.success,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
   },
 });

@@ -56,7 +56,7 @@
 | created_at        | timestamptz |                 |
 | updated_at        | timestamptz |                 |
 | type              | text        |                 |
-| swarm_status      | text        |                 |
+| swarm_status      | text        | CHECK: empty, developing, ready, natural |
 | swarm_start_date  | timestamptz |                 |
 
 ### hive_notes
