@@ -119,10 +119,7 @@ export default function PolenScreen() {
   };
 
   const formatWeight = (grams: number) => {
-    if (grams >= 1000) {
-      return `${(grams / 1000).toFixed(2).replace(".", ",")} kg`;
-    }
-    return `${grams} g`;
+    return `${(grams / 1000).toFixed(2).replace(".", ",")} kg`;
   };
 
   return (
@@ -145,9 +142,9 @@ export default function PolenScreen() {
       {sortedHarvests.length === 0 ? (
         <EmptyState
           icon="flower-outline"
-          title="Nema zabilježenih berbi"
-          message="Dodajte svoju prvu berbu polena pritiskom na dugme ispod."
-          actionLabel="Dodaj berbu"
+          title="Nema podataka o unosu polena"
+          message="Dodaj prvi unos polena pritiskom na dugme ispod."
+          actionLabel="Dodaj unos polena"
           onAction={openAddModal}
         />
       ) : (
