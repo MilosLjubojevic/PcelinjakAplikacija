@@ -250,6 +250,16 @@ export interface Note {
   updatedAt: Date;
 }
 
+// Polen harvest type
+export interface PolenHarvest {
+  id: string;
+  date: Date;
+  weightGrams: number;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Dashboard metrics
 export interface DashboardMetrics {
   totalHives: number;
@@ -278,5 +288,6 @@ export interface AppState {
   expenses: Expense[];
   incomes: Income[];
   notes: Note[];
+  polenHarvests: PolenHarvest[];
   lastUpdated: Date;
 }

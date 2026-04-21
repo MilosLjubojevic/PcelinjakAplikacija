@@ -2,7 +2,7 @@ import { supabase, isSupabaseConfigured } from '../utils/supabase';
 import {
   Location, HiveRow, Hive, HiveNote,
   Queen, QueenBoxRow, QueenBox,
-  Sale, SaleItem, Expense, Income, Note,
+  Sale, SaleItem, Expense, Income, Note, PolenHarvest,
 } from '../types';
 import {
   locationToDb, dbToLocation,
@@ -17,10 +17,11 @@ import {
   expenseToDb, dbToExpense,
   incomeToDb, dbToIncome,
   noteToDb, dbToNote,
+  polenHarvestToDb, dbToPolenHarvest,
   groupBy, deduplicateByKey,
   DbLocation, DbHiveRow, DbHive, DbHiveNote, DbHiveDateEntry,
   DbQueen, DbQueenBoxRow, DbQueenBox,
-  DbSale, DbSaleItem, DbExpense, DbIncome, DbNote,
+  DbSale, DbSaleItem, DbExpense, DbIncome, DbNote, DbPolenHarvest,
 } from '../utils/supabaseMapper';
 
 // ============================================================
@@ -807,6 +808,65 @@ export async function deleteNote(userId: string, id: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('Error deleting note:', error);
+    return false;
+  }
+}
+
+// ============================================================
+// POLEN HARVESTS
+// ============================================================
+
+export async function fetchAllPolenHarvests(userId: string): Promise<PolenHarvest[]> {
+  const { data, error } = await supabase
+    .from('polen_harvests')
+    .select('*')
+    .order('date', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(dbToPolenHarvest);
+}
+
+export async function insertPolenHarvest(userId: string, harvest: PolenHarvest): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('polen_harvests')
+      .insert([polenHarvestToDb(harvest, userId)]);
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error inserting polen harvest:', error);
+    return false;
+  }
+}
+
+export async function updatePolenHarvest(userId: string, id: string, updates: Partial<PolenHarvest>): Promise<boolean> {
+  try {
+    const dbUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
+    if (updates.date !== undefined) dbUpdates.date = updates.date.toISOString();
+    if (updates.weightGrams !== undefined) dbUpdates.weight_grams = updates.weightGrams;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes ?? null;
+
+    const { error } = await supabase
+      .from('polen_harvests')
+      .update(dbUpdates)
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating polen harvest:', error);
+    return false;
+  }
+}
+
+export async function deletePolenHarvest(userId: string, id: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('polen_harvests')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error deleting polen harvest:', error);
     return false;
   }
 }

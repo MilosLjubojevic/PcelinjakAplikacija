@@ -131,6 +131,16 @@ function AuthGate() {
             }}
           />
           <Drawer.Screen
+            name="polen"
+            options={{
+              drawerLabel: "Polen",
+              title: "Polen",
+              drawerIcon: ({ color, size }) => (
+                <Ionicons name="flower-outline" size={size} color={color} />
+              ),
+            }}
+          />
+          <Drawer.Screen
             name="analytics"
             options={{
               drawerLabel: "Analitika",

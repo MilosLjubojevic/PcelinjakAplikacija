@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppState, Location, Queen, QueenBoxRow, Sale, Expense, Income, Note, DashboardMetrics } from '../types';
+import { AppState, Location, Queen, QueenBoxRow, Sale, Expense, Income, Note, PolenHarvest, DashboardMetrics } from '../types';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
 import { isSupabaseConfigured, supabase } from '../utils/supabase';
@@ -33,6 +33,9 @@ interface AppContextType {
   addNote: (note: Note) => Promise<void>;
   updateNote: (id: string, note: Partial<Note>) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
+  addPolenHarvest: (harvest: PolenHarvest) => Promise<void>;
+  updatePolenHarvest: (id: string, harvest: Partial<PolenHarvest>) => Promise<void>;
+  deletePolenHarvest: (id: string) => Promise<void>;
   refreshData: () => void;
   clearAllData: () => Promise<void>;
   exportData: () => Promise<string>;
@@ -51,6 +54,7 @@ const emptyState: AppState = {
   expenses: [],
   incomes: [],
   notes: [],
+  polenHarvests: [],
   lastUpdated: new Date(),
 };
 
@@ -104,7 +108,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       // Fetch all data from Supabase in parallel
-      const [locations, queens, queenBoxRows, salesList, expensesList, incomesList, notesList] =
+      const [locations, queens, queenBoxRows, salesList, expensesList, incomesList, notesList, polenHarvestsList] =
         await Promise.all([
           db.fetchAllLocations(uid),
           db.fetchAllQueens(uid),
@@ -113,6 +117,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           db.fetchAllExpenses(uid),
           db.fetchAllIncomes(uid),
           db.fetchAllNotes(uid),
+          db.fetchAllPolenHarvests(uid),
         ]);
 
       setState({
@@ -123,6 +128,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         expenses: expensesList,
         incomes: incomesList,
         notes: notesList,
+        polenHarvests: polenHarvestsList,
         lastUpdated: new Date(),
       });
     } catch (e: any) {
@@ -567,6 +573,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [updateState, userId, state.notes, showToast]);
 
   // ============================================================
+  // POLEN HARVEST operations
+  // ============================================================
+
+  const addPolenHarvest = useCallback(async (harvest: PolenHarvest) => {
+    if (!userId) return;
+    updateState(prev => ({ ...prev, polenHarvests: [...(prev.polenHarvests || []), harvest] }));
+    const success = await db.insertPolenHarvest(userId, harvest);
+    if (!success) {
+      updateState(prev => ({ ...prev, polenHarvests: (prev.polenHarvests || []).filter(h => h.id !== harvest.id) }));
+      showToast('Greška pri dodavanju berbe polena', 'error');
+      return;
+    }
+    showToast('Berba polena dodana');
+  }, [updateState, userId, showToast]);
+
+  const updatePolenHarvest = useCallback(async (id: string, updates: Partial<PolenHarvest>) => {
+    if (!userId) return;
+    const snapshot = state.polenHarvests || [];
+    updateState(prev => ({
+      ...prev,
+      polenHarvests: (prev.polenHarvests || []).map(h =>
+        h.id === id ? { ...h, ...updates, updatedAt: new Date() } : h
+      ),
+    }));
+    const success = await db.updatePolenHarvest(userId, id, updates);
+    if (!success) {
+      updateState(prev => ({ ...prev, polenHarvests: snapshot }));
+      showToast('Greška pri ažuriranju berbe polena', 'error');
+    }
+  }, [updateState, userId, state.polenHarvests, showToast]);
+
+  const deletePolenHarvest = useCallback(async (id: string) => {
+    if (!userId) return;
+    const snapshot = state.polenHarvests || [];
+    updateState(prev => ({ ...prev, polenHarvests: (prev.polenHarvests || []).filter(h => h.id !== id) }));
+    const success = await db.deletePolenHarvest(userId, id);
+    if (!success) {
+      updateState(prev => ({ ...prev, polenHarvests: snapshot }));
+      showToast('Greška pri brisanju berbe polena', 'error');
+      return;
+    }
+    showToast('Berba polena obrisana');
+  }, [updateState, userId, state.polenHarvests, showToast]);
+
+  // ============================================================
   // UTILITY operations
   // ============================================================
 
@@ -604,6 +655,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addExpense, updateExpense, deleteExpense,
     addIncome, updateIncome, deleteIncome,
     addNote, updateNote, deleteNote,
+    addPolenHarvest, updatePolenHarvest, deletePolenHarvest,
     refreshData, clearAllData, exportData,
   };
 

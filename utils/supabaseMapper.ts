@@ -6,6 +6,7 @@ import {
   Expense, ExpenseCategory,
   Income, IncomeCategory,
   Note,
+  PolenHarvest,
 } from '../types';
 
 // ============================================================
@@ -175,6 +176,16 @@ export interface DbNote {
   title: string;
   content: string;
   date: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbPolenHarvest {
+  id: string;
+  user_id: string;
+  date: string;
+  weight_grams: number;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -593,6 +604,31 @@ export function dbToNote(db: DbNote): Note {
     title: db.title,
     content: db.content,
     date: toDateRequired(db.date),
+    createdAt: toDateRequired(db.created_at),
+    updatedAt: toDateRequired(db.updated_at),
+  };
+}
+
+// ============================================================
+// PolenHarvest mappers
+// ============================================================
+
+export function polenHarvestToDb(harvest: PolenHarvest, userId: string): Omit<DbPolenHarvest, 'created_at' | 'updated_at'> {
+  return {
+    id: harvest.id,
+    user_id: userId,
+    date: toIsoRequired(harvest.date),
+    weight_grams: harvest.weightGrams,
+    notes: harvest.notes ?? null,
+  };
+}
+
+export function dbToPolenHarvest(db: DbPolenHarvest): PolenHarvest {
+  return {
+    id: db.id,
+    date: toDateRequired(db.date),
+    weightGrams: db.weight_grams,
+    notes: db.notes ?? undefined,
     createdAt: toDateRequired(db.created_at),
     updatedAt: toDateRequired(db.updated_at),
   };
