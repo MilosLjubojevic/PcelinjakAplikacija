@@ -57,7 +57,7 @@ export default function PolenScreen() {
     setEditingHarvest(harvest);
     setFormData({
       date: harvest.date,
-      weightGrams: String(harvest.weightGrams),
+      weightGrams: String(harvest.weightGrams / 1000),
       notes: harvest.notes ?? "",
     });
     setModalVisible(true);
@@ -73,18 +73,19 @@ export default function PolenScreen() {
       Alert.alert("Greška", "Datum je obavezan.");
       return;
     }
-    const weight = parseFloat(formData.weightGrams.replace(",", "."));
-    if (isNaN(weight) || weight <= 0) {
-      Alert.alert("Greška", "Unesite ispravnu težinu (u gramima).");
+    const weightKg = parseFloat(formData.weightGrams.replace(",", "."));
+    if (isNaN(weightKg) || weightKg <= 0) {
+      Alert.alert("Greška", "Unesite ispravnu težinu (u kilogramima).");
       return;
     }
+    const weightGrams = Math.round(weightKg * 1000);
 
     const now = new Date();
 
     if (editingHarvest) {
       await updatePolenHarvest(editingHarvest.id, {
         date: formData.date,
-        weightGrams: weight,
+        weightGrams,
         notes: formData.notes.trim() || undefined,
         updatedAt: now,
       });
@@ -92,7 +93,7 @@ export default function PolenScreen() {
       const newHarvest: PolenHarvest = {
         id: Crypto.randomUUID(),
         date: formData.date,
-        weightGrams: weight,
+        weightGrams,
         notes: formData.notes.trim() || undefined,
         createdAt: now,
         updatedAt: now,
@@ -212,7 +213,7 @@ export default function PolenScreen() {
           onChange={(date) => setFormData((prev) => ({ ...prev, date }))}
         />
         <Input
-          label="Težina (g)"
+          label="Težina (kg)"
           value={formData.weightGrams}
           onChangeText={(text) => setFormData((prev) => ({ ...prev, weightGrams: text }))}
           placeholder="npr. 250"
