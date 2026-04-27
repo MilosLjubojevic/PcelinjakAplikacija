@@ -335,13 +335,13 @@ export default function HivesScreen() {
   const confirmRemoveSlot = async () => {
     if (!deleteConfirm || !currentLocation) return;
     const { rowId, hiveId } = deleteConfirm;
+    setDeleteConfirm(null);
     const updatedRows = currentLocation.rows.map((r) =>
       r.id === rowId
         ? { ...r, hives: r.hives.filter((h) => h.id !== hiveId), updatedAt: new Date() }
         : r
     );
     await updateLocation(currentLocation.id, { rows: updatedRows });
-    setDeleteConfirm(null);
   };
 
   const handleSaveSwarm = async () => {
@@ -399,10 +399,10 @@ export default function HivesScreen() {
   const confirmDeleteRow = async () => {
     if (!deleteRowConfirm || !currentLocation) return;
     const { rowId } = deleteRowConfirm;
+    setDeleteRowConfirm(null);
+    setExpandedRows((prev) => prev.filter((id) => id !== rowId));
     const updatedRows = currentLocation.rows.filter((r) => r.id !== rowId);
     await updateLocation(currentLocation.id, { rows: updatedRows });
-    setExpandedRows((prev) => prev.filter((id) => id !== rowId));
-    setDeleteRowConfirm(null);
   };
 
   const toggleRow = (rowId: string) => {
