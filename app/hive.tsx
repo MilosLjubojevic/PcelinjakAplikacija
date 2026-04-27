@@ -428,43 +428,52 @@ export default function HivesScreen() {
     );
   };
 
+  // Hive health — green / red
   const getHealthColor = (health: string) => {
     switch (health) {
-      case "good":
-        return COLORS.success;
-      case "bad":
-        return COLORS.danger;
-      case "warning":
-        return COLORS.primary;
-      default:
-        return COLORS.textMuted;
+      case "good":  return "#16A34A"; // green-600
+      case "bad":   return "#DC2626"; // red-600
+      default:      return COLORS.textMuted;
     }
   };
+
+  const getHealthBg = (health: string) => {
+    switch (health) {
+      case "good": return "#DCFCE7"; // green-100
+      case "bad":  return "#FEE2E2"; // red-100
+      default:     return COLORS.background;
+    }
+  };
+
+  // Queen indicator — violet (has) / orange (no)
+  const QUEEN_YES_COLOR = "#7C3AED"; // violet-600
+  const QUEEN_NO_COLOR  = "#EA580C"; // orange-600
 
   const getSwarmStatusLabel = (status: SwarmStatus) => {
     switch (status) {
-      case "empty": return "Prazan";
+      case "empty":      return "Prazan";
       case "developing": return "Razvija se";
-      case "ready": return "Spreman";
-      case "natural": return "Prirodni";
+      case "ready":      return "Spreman";
+      case "natural":    return "Prirodni";
     }
   };
 
+  // Swarm status — each state has a unique color, all distinct from health colors
   const getSwarmStatusColor = (status: SwarmStatus) => {
     switch (status) {
-      case "empty": return COLORS.textMuted;
-      case "developing": return COLORS.primary;
-      case "ready": return COLORS.success;
-      case "natural": return COLORS.info;
+      case "empty":      return "#9CA3AF"; // gray
+      case "developing": return "#D97706"; // amber-600
+      case "ready":      return "#0891B2"; // cyan-600
+      case "natural":    return "#2563EB"; // blue-600
     }
   };
 
   const getSwarmStatusBg = (status: SwarmStatus) => {
     switch (status) {
-      case "empty": return COLORS.accent.swarmLight;
-      case "developing": return COLORS.accent.hiveLight;
-      case "ready": return COLORS.successLight;
-      case "natural": return COLORS.infoLight;
+      case "empty":      return "#F3F4F6"; // gray-100
+      case "developing": return "#FEF3C7"; // amber-100
+      case "ready":      return "#CFFAFE"; // cyan-100
+      case "natural":    return "#DBEAFE"; // blue-100
     }
   };
 
@@ -609,19 +618,19 @@ export default function HivesScreen() {
       {/* Color Legend */}
       <View style={styles.legend}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendSwatch, { borderColor: COLORS.success }]} />
+          <View style={[styles.legendSwatch, { borderColor: "#16A34A", backgroundColor: "#DCFCE7" }]} />
           <Text style={styles.legendLabel}>Zdravo</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendSwatch, { borderColor: COLORS.danger }]} />
+          <View style={[styles.legendSwatch, { borderColor: "#DC2626", backgroundColor: "#FEE2E2" }]} />
           <Text style={styles.legendLabel}>Loše</Text>
         </View>
         <View style={styles.legendItem}>
-          <Ionicons name="checkmark-circle" size={12} color={COLORS.success} />
+          <Ionicons name="checkmark-circle" size={12} color="#7C3AED" />
           <Text style={styles.legendLabel}>Ima maticu</Text>
         </View>
         <View style={styles.legendItem}>
-          <Ionicons name="alert-circle" size={12} color={COLORS.danger} />
+          <Ionicons name="close-circle" size={12} color="#EA580C" />
           <Text style={styles.legendLabel}>Nema matice</Text>
         </View>
         <View style={styles.legendItem}>
@@ -629,8 +638,20 @@ export default function HivesScreen() {
           <Text style={styles.legendLabel}>Polen</Text>
         </View>
         <View style={styles.legendItem}>
-          <Ionicons name="cube" size={12} color={COLORS.accent.swarm} />
-          <Text style={styles.legendLabel}>Roj</Text>
+          <View style={[styles.legendSwatch, { borderColor: "#9CA3AF", backgroundColor: "#F3F4F6" }]} />
+          <Text style={styles.legendLabel}>Roj: Prazan</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { borderColor: "#D97706", backgroundColor: "#FEF3C7" }]} />
+          <Text style={styles.legendLabel}>Razvija se</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { borderColor: "#0891B2", backgroundColor: "#CFFAFE" }]} />
+          <Text style={styles.legendLabel}>Spreman</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { borderColor: "#2563EB", backgroundColor: "#DBEAFE" }]} />
+          <Text style={styles.legendLabel}>Prirodni</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { borderColor: COLORS.borderMedium, opacity: 0.5 }]} />
@@ -727,9 +748,9 @@ export default function HivesScreen() {
                           style={[
                             styles.hiveBox,
                             { width: hiveBoxSize, height: hiveBoxSize, borderRadius: hiveBoxSize * 0.16 },
-                            { borderColor: getHealthColor(hive.health) },
-                            isSwarm && styles.swarmBox,
-                            isSwarm && { backgroundColor: getSwarmStatusBg(hive.swarmStatus || 'empty') },
+                            isSwarm
+                              ? { borderColor: getSwarmStatusColor(hive.swarmStatus || 'empty'), backgroundColor: getSwarmStatusBg(hive.swarmStatus || 'empty') }
+                              : { borderColor: getHealthColor(hive.health), backgroundColor: getHealthBg(hive.health) },
                             isInactive && styles.hiveBoxInactive,
                           ]}
                           onPress={() => openEditHiveModal(hive, row.id)}
@@ -758,14 +779,14 @@ export default function HivesScreen() {
                             <Ionicons
                               name="checkmark-circle"
                               size={FONT_SIZE.xs}
-                              color={COLORS.success}
+                              color={QUEEN_YES_COLOR}
                               style={styles.queenIcon}
                             />
                           ) : (
                             <Ionicons
-                              name="alert-circle"
+                              name="close-circle"
                               size={FONT_SIZE.xs}
-                              color={COLORS.danger}
+                              color={QUEEN_NO_COLOR}
                               style={styles.queenIcon}
                             />
                           )}
@@ -1252,6 +1273,21 @@ export default function HivesScreen() {
             style={{ flex: 1, marginLeft: SPACING.sm }}
           />
         </View>
+        <TouchableOpacity
+          style={styles.deleteHiveButton}
+          onPress={() => {
+            if (!editingHive || !currentLocation) return;
+            const rowId = editingHive.rowId;
+            const hiveId = editingHive.id;
+            const hiveNumber = editingHive.number;
+            setEditHiveModalVisible(false);
+            resetHiveForm();
+            handleRemoveSlot(rowId, hiveId, hiveNumber, 'hive');
+          }}
+        >
+          <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
+          <Text style={styles.deleteHiveButtonText}>Obriši košnicu</Text>
+        </TouchableOpacity>
       </Modal>
 
       {/* Slot Type Picker Modal */}
@@ -1462,6 +1498,22 @@ export default function HivesScreen() {
             style={{ flex: 1, marginLeft: SPACING.sm }}
           />
         </View>
+        <TouchableOpacity
+          style={styles.deleteHiveButton}
+          onPress={() => {
+            if (!editingHive || !currentLocation) return;
+            const rowId = editingHive.rowId;
+            const hiveId = editingHive.id;
+            const hiveNumber = editingHive.number;
+            setEditSwarmModalVisible(false);
+            resetSwarmForm();
+            setEditingHive(null);
+            handleRemoveSlot(rowId, hiveId, hiveNumber, 'swarm');
+          }}
+        >
+          <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
+          <Text style={styles.deleteHiveButtonText}>Obriši roj</Text>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -1632,12 +1684,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     color: COLORS.textMuted,
   },
-  swarmBox: {
-    backgroundColor: COLORS.accent.swarmLight,
-  },
   hiveBox: {
     borderWidth: 3,
-    backgroundColor: COLORS.background,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
@@ -1868,6 +1916,22 @@ const styles = StyleSheet.create({
   typeSwitcherLabel: {
     fontSize: FONT_SIZE.md,
     fontWeight: "600",
+  },
+  deleteHiveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.sm,
+    marginTop: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+  },
+  deleteHiveButtonText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: "600",
+    color: COLORS.danger,
   },
   legend: {
     flexDirection: "row",
