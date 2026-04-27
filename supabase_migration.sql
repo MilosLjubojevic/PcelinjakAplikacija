@@ -335,6 +335,12 @@ alter table notes enable row level security;
 create policy "Users manage own notes"
   on notes for all to authenticated using (true) with check (true);
 
+-- ============================================
+-- 16. pollen_harvests (berbe polena) — created manually in Supabase dashboard
+-- ============================================
+-- Table already exists. Run this once to enable Realtime sync:
+-- alter publication supabase_realtime add table pollen_harvests;
+
 -- ================================================================
 -- Migration v2: Unified slot-based rows
 -- Merge swarms into hives table, link queen_box_rows to locations

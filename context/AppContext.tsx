@@ -20,6 +20,7 @@ interface AppContextType {
   deleteQueen: (id: string) => Promise<void>;
   addQueenBoxRow: (row: QueenBoxRow) => Promise<void>;
   updateQueenBoxRow: (id: string, row: Partial<QueenBoxRow>) => Promise<void>;
+  reorderQueenBoxRows: (reordered: QueenBoxRow[]) => Promise<void>;
   deleteQueenBoxRow: (id: string) => Promise<void>;
   addSale: (sale: Sale) => Promise<void>;
   updateSale: (id: string, sale: Partial<Sale>) => Promise<void>;
@@ -379,6 +380,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [updateState, userId, state.queenBoxRows, showToast]);
 
+  const reorderQueenBoxRows = useCallback(async (reordered: QueenBoxRow[]) => {
+    if (!userId) return;
+    const snapshot = state.queenBoxRows || [];
+    const withOrder = reordered.map((row, i) => ({ ...row, order: i }));
+    updateState(prev => ({ ...prev, queenBoxRows: withOrder }));
+    const results = await Promise.all(
+      withOrder
+        .filter((row, i) => snapshot.find(r => r.id === row.id)?.order !== i)
+        .map(row => db.updateQueenBoxRowScalars(userId, row.id, { order: row.order }))
+    );
+    if (results.some(ok => !ok)) {
+      const freshRows = await db.fetchAllQueenBoxRows(userId);
+      updateState(prev => ({ ...prev, queenBoxRows: freshRows }));
+      showToast('Neuspješno preuređivanje redova. Podaci su osvježeni.', 'error');
+    }
+  }, [updateState, userId, state.queenBoxRows, showToast]);
+
   const deleteQueenBoxRow = useCallback(async (id: string) => {
     if (!userId) return;
     const snapshot = state.queenBoxRows || [];
@@ -650,7 +668,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     metrics,
     addLocation, updateLocation, deleteLocation,
     addQueen, updateQueen, deleteQueen,
-    addQueenBoxRow, updateQueenBoxRow, deleteQueenBoxRow,
+    addQueenBoxRow, updateQueenBoxRow, reorderQueenBoxRows, deleteQueenBoxRow,
     addSale, updateSale, deleteSale,
     addExpense, updateExpense, deleteExpense,
     addIncome, updateIncome, deleteIncome,

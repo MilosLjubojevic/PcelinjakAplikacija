@@ -1,6 +1,6 @@
 import React, { ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, State } from 'react-native-gesture-handler';
 import Reanimated, {
   SharedValue,
   useAnimatedStyle,
@@ -132,14 +132,17 @@ function DraggableItem({
             }
           );
         })
-        .onFinalize(() => {
+        .onFinalize((e) => {
           'worklet';
-          if (activeId.value === itemId) {
-            activeId.value = '';
-            dragTranslateY.value = 0;
-            displacements.value = {};
-            runOnJS(onDragEndJS)();
-          }
+          if (activeId.value !== itemId) return;
+          // For a normal end, onEnd already started a spring animation to 0 —
+          // don't reset here or we'd snap back before the state update renders.
+          if (e.state === State.END) return;
+          // Gesture was cancelled or failed — clean up immediately.
+          activeId.value = '';
+          dragTranslateY.value = 0;
+          displacements.value = {};
+          runOnJS(onDragEndJS)();
         }),
     // itemId is stable per instance; shared values have stable references
     // eslint-disable-next-line react-hooks/exhaustive-deps
