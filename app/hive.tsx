@@ -7,10 +7,10 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Alert,
   useWindowDimensions,
 } from "react-native";
 import Button from "../components/Button";
+import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import DatePicker from "../components/DatePicker";
 import Input from "../components/Input";
 import Modal from "../components/Modal";
@@ -329,27 +329,19 @@ export default function HivesScreen() {
 
   const handleRemoveSlot = (rowId: string, hiveId: string, hiveNumber: number, type: HiveType) => {
     if (!currentLocation) return;
+    setDeleteConfirm({ visible: true, rowId, hiveId, hiveNumber, type });
+  };
 
-    const label = type === 'swarm' ? 'roj' : 'košnicu';
-    Alert.alert(
-      `Obriši ${type === 'swarm' ? 'Roj' : 'Košnicu'}`,
-      `Da li ste sigurni da želite da obrišete ${label} ${hiveNumber}?`,
-      [
-        { text: "Otkaži", style: "cancel" },
-        {
-          text: "Obriši",
-          style: "destructive",
-          onPress: async () => {
-            const updatedRows = currentLocation.rows.map((r) =>
-              r.id === rowId
-                ? { ...r, hives: r.hives.filter((h) => h.id !== hiveId), updatedAt: new Date() }
-                : r
-            );
-            await updateLocation(currentLocation.id, { rows: updatedRows });
-          },
-        },
-      ]
+  const confirmRemoveSlot = async () => {
+    if (!deleteConfirm || !currentLocation) return;
+    const { rowId, hiveId } = deleteConfirm;
+    const updatedRows = currentLocation.rows.map((r) =>
+      r.id === rowId
+        ? { ...r, hives: r.hives.filter((h) => h.id !== hiveId), updatedAt: new Date() }
+        : r
     );
+    await updateLocation(currentLocation.id, { rows: updatedRows });
+    setDeleteConfirm(null);
   };
 
   const handleSaveSwarm = async () => {
@@ -401,23 +393,16 @@ export default function HivesScreen() {
 
   const handleDeleteRow = (rowId: string, rowName: string) => {
     if (!currentLocation) return;
+    setDeleteRowConfirm({ visible: true, rowId, rowName });
+  };
 
-    Alert.alert(
-      "Obriši Red",
-      `Da li ste sigurni da želite da obrišete "${rowName}" i sve košnice u njemu?`,
-      [
-        { text: "Otkaži", style: "cancel" },
-        {
-          text: "Obriši",
-          style: "destructive",
-          onPress: async () => {
-            const updatedRows = currentLocation.rows.filter((r) => r.id !== rowId);
-            await updateLocation(currentLocation.id, { rows: updatedRows });
-            setExpandedRows((prev) => prev.filter((id) => id !== rowId));
-          },
-        },
-      ]
-    );
+  const confirmDeleteRow = async () => {
+    if (!deleteRowConfirm || !currentLocation) return;
+    const { rowId } = deleteRowConfirm;
+    const updatedRows = currentLocation.rows.filter((r) => r.id !== rowId);
+    await updateLocation(currentLocation.id, { rows: updatedRows });
+    setExpandedRows((prev) => prev.filter((id) => id !== rowId));
+    setDeleteRowConfirm(null);
   };
 
   const toggleRow = (rowId: string) => {
@@ -505,6 +490,18 @@ export default function HivesScreen() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isDraggingRows, setIsDraggingRows] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    visible: boolean;
+    rowId: string;
+    hiveId: string;
+    hiveNumber: number;
+    type: HiveType;
+  } | null>(null);
+  const [deleteRowConfirm, setDeleteRowConfirm] = useState<{
+    visible: boolean;
+    rowId: string;
+    rowName: string;
+  } | null>(null);
 
   const handleRowsReorder = useCallback(async (reorderedRows: HiveRow[]) => {
     if (!currentLocation) return;
@@ -1368,6 +1365,28 @@ export default function HivesScreen() {
           />
         </View>
       </Modal>
+
+      {/* Delete Hive/Swarm Confirmation */}
+      <ConfirmDeleteModal
+        visible={deleteConfirm?.visible === true}
+        title={deleteConfirm?.type === 'swarm' ? 'Obriši Roj' : 'Obriši Košnicu'}
+        message={
+          deleteConfirm?.type === 'swarm'
+            ? `Da li ste sigurni da želite da obrišete roj ${deleteConfirm?.hiveNumber}? Ova akcija se ne može poništiti.`
+            : `Da li ste sigurni da želite da obrišete košnicu ${deleteConfirm?.hiveNumber}? Ova akcija se ne može poništiti.`
+        }
+        onConfirm={confirmRemoveSlot}
+        onCancel={() => setDeleteConfirm(null)}
+      />
+
+      {/* Delete Row Confirmation */}
+      <ConfirmDeleteModal
+        visible={deleteRowConfirm?.visible === true}
+        title="Obriši Red"
+        message={`Da li ste sigurni da želite da obrišete "${deleteRowConfirm?.rowName}" i sve košnice u njemu? Ova akcija se ne može poništiti.`}
+        onConfirm={confirmDeleteRow}
+        onCancel={() => setDeleteRowConfirm(null)}
+      />
 
       {/* Edit Swarm Modal */}
       <Modal
