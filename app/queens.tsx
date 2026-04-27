@@ -37,7 +37,7 @@ const statusOptions: PickerOption[] = [
 ];
 
 export default function QueensScreen() {
-  const { state, loading, addQueenBoxRow, updateQueenBoxRow, deleteQueenBoxRow, refreshData } = useApp();
+  const { state, loading, addQueenBoxRow, updateQueenBoxRow, reorderQueenBoxRows, deleteQueenBoxRow, refreshData } = useApp();
   const { showToast } = useToast();
   const [selectedLocationId, setSelectedLocationId] = useState(state.locations[0]?.id || "");
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
@@ -449,19 +449,8 @@ export default function QueensScreen() {
   const [isDraggingRows, setIsDraggingRows] = useState(false);
 
   const handleRowsReorder = useCallback(async (reorderedRows: QueenBoxRow[]) => {
-    try {
-      await Promise.all(
-        reorderedRows.map((row, i) => {
-          if (row.order !== i) return updateQueenBoxRow(row.id, { order: i });
-          return Promise.resolve();
-        })
-      );
-    } catch (error) {
-      console.error("Failed to reorder queen box rows:", error);
-      showToast("Neuspješno preuređivanje redova. Podaci su osvježeni.", "error");
-      await refreshData();
-    }
-  }, [refreshData, showToast, updateQueenBoxRow]);
+    await reorderQueenBoxRows(reorderedRows);
+  }, [reorderQueenBoxRows]);
 
   if (loading) {
     return (
@@ -573,6 +562,32 @@ export default function QueensScreen() {
       </View>
 
       <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Pretraži redove/oplodnjake..." />
+
+      {/* Color Legend */}
+      <View style={styles.legend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { borderColor: COLORS.primary }]} />
+          <Text style={styles.legendLabel}>U razvoju</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { borderColor: COLORS.success, backgroundColor: COLORS.successLight }]} />
+          <Text style={styles.legendLabel}>Zrela</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { borderColor: COLORS.borderMedium, backgroundColor: COLORS.border, opacity: 0.7 }]} />
+          <Text style={styles.legendLabel}>Prazna</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendCounterSwatch]}>
+            <Text style={styles.legendCounterText}>15d</Text>
+          </View>
+          <Text style={styles.legendLabel}>Dani do zrelosti</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { borderColor: COLORS.danger }]} />
+          <Text style={styles.legendLabel}>Zahtijeva pažnju</Text>
+        </View>
+      </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false} scrollEnabled={!isDraggingRows}>
         {searchedRows.length === 0 ? (
@@ -1394,5 +1409,40 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.success,
     borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.md,
+  },
+  legend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.sm,
+    gap: SPACING.md,
+    rowGap: SPACING.xs,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
+  },
+  legendSwatch: {
+    width: 13,
+    height: 13,
+    borderRadius: 3,
+    borderWidth: 2.5,
+    backgroundColor: COLORS.background,
+  },
+  legendLabel: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+  },
+  legendCounterSwatch: {
+    backgroundColor: COLORS.info,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: SPACING.xs,
+  },
+  legendCounterText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: "bold",
+    color: COLORS.surface,
   },
 });

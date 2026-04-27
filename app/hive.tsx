@@ -606,6 +606,38 @@ export default function HivesScreen() {
       {/* Search */}
       <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Pretraži košnice po broju..." />
 
+      {/* Color Legend */}
+      <View style={styles.legend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { borderColor: COLORS.success }]} />
+          <Text style={styles.legendLabel}>Zdravo</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { borderColor: COLORS.danger }]} />
+          <Text style={styles.legendLabel}>Loše</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <Ionicons name="checkmark-circle" size={12} color={COLORS.success} />
+          <Text style={styles.legendLabel}>Ima maticu</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <Ionicons name="alert-circle" size={12} color={COLORS.danger} />
+          <Text style={styles.legendLabel}>Nema matice</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <Ionicons name="flower" size={12} color={COLORS.primary} />
+          <Text style={styles.legendLabel}>Polen</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <Ionicons name="cube" size={12} color={COLORS.accent.swarm} />
+          <Text style={styles.legendLabel}>Roj</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSwatch, { borderColor: COLORS.borderMedium, opacity: 0.5 }]} />
+          <Text style={styles.legendLabel}>Neaktivna</Text>
+        </View>
+      </View>
+
       {/* Rows List */}
       <ScrollView
         style={styles.scrollView}
@@ -1836,5 +1868,29 @@ const styles = StyleSheet.create({
   typeSwitcherLabel: {
     fontSize: FONT_SIZE.md,
     fontWeight: "600",
+  },
+  legend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.sm,
+    gap: SPACING.md,
+    rowGap: SPACING.xs,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
+  },
+  legendSwatch: {
+    width: 13,
+    height: 13,
+    borderRadius: 3,
+    borderWidth: 2.5,
+    backgroundColor: COLORS.background,
+  },
+  legendLabel: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
   },
 });
