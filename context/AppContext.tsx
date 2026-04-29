@@ -76,12 +76,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [userId]);
 
-  const loadData = async (uid: string) => {
+  const loadData = async (uid: string, silent = false) => {
     // Prevent concurrent loads (React strict mode / double mount)
     if (loadingRef.current) return;
     loadingRef.current = true;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
 
       if (!isSupabaseConfigured()) {
@@ -157,7 +157,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (debounceTimer) clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
             loadingRef.current = false;
-            loadData(userId);
+            loadData(userId, true);
           }, 500);
         }
       )

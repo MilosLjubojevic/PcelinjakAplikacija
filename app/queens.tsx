@@ -241,7 +241,7 @@ export default function QueensScreen() {
       updatedAt: now,
     };
 
-    await updateQueenBoxRow(rowId, {
+    updateQueenBoxRow(rowId, {
       queenBoxes: [...boxesSnapshot, newBox],
     });
 
@@ -372,11 +372,11 @@ export default function QueensScreen() {
       const updatedBoxes = row.queenBoxes.map((b) =>
         b.id === box.id ? updatedBox : b
       );
-      await updateQueenBoxRow(rowId, { queenBoxes: updatedBoxes });
+      updateQueenBoxRow(rowId, { queenBoxes: updatedBoxes });
     } else if (box.status === "mature") {
       // 3rd tap: remove the box entirely
       const updatedBoxes = row.queenBoxes.filter((b) => b.id !== box.id);
-      await updateQueenBoxRow(rowId, { queenBoxes: updatedBoxes });
+      updateQueenBoxRow(rowId, { queenBoxes: updatedBoxes });
     }
   };
 

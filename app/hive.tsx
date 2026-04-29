@@ -322,7 +322,7 @@ export default function HivesScreen() {
         : r
     );
 
-    await updateLocation(currentLocation.id, { rows: updatedRows });
+    updateLocation(currentLocation.id, { rows: updatedRows });
     setPendingSlotRowId(null);
     setPendingSlotNumber(null);
   };
@@ -938,7 +938,7 @@ export default function HivesScreen() {
                 ...row,
                 hives: row.hives.map((h) => (h.id === editingHive.id ? updatedHive : h)),
               }));
-              await updateLocation(currentLocation.id, { rows: updatedRows });
+              updateLocation(currentLocation.id, { rows: updatedRows });
               setEditHiveModalVisible(false);
               resetHiveForm();
               // Open swarm modal with updated hive
@@ -1418,7 +1418,7 @@ export default function HivesScreen() {
                 ...row,
                 hives: row.hives.map((h) => (h.id === editingHive.id ? updatedHive : h)),
               }));
-              await updateLocation(currentLocation.id, { rows: updatedRows });
+              updateLocation(currentLocation.id, { rows: updatedRows });
               setEditSwarmModalVisible(false);
               resetSwarmForm();
               // Open hive modal with updated hive
