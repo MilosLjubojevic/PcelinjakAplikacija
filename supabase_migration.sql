@@ -336,10 +336,30 @@ create policy "Users manage own notes"
   on notes for all to authenticated using (true) with check (true);
 
 -- ============================================
--- 16. pollen_harvests (berbe polena) — created manually in Supabase dashboard
+-- 16. polen_harvests (berbe polena)
 -- ============================================
--- Table already exists. Run this once to enable Realtime sync:
--- alter publication supabase_realtime add table pollen_harvests;
+-- If the table doesn't exist yet, create it:
+-- create table if not exists public.polen_harvests (
+--   id uuid primary key default gen_random_uuid(),
+--   user_id uuid not null references auth.users(id) on delete cascade,
+--   date timestamptz not null,
+--   weight_grams numeric not null,
+--   notes text,
+--   created_at timestamptz not null default now(),
+--   updated_at timestamptz not null default now()
+-- );
+
+-- Run these in Supabase SQL Editor to fix cross-device sync:
+alter table public.polen_harvests enable row level security;
+
+drop policy if exists "Users manage own polen harvests" on public.polen_harvests;
+create policy "Users manage own polen harvests"
+  on public.polen_harvests for all to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+alter table public.polen_harvests replica identity full;
+alter publication supabase_realtime add table public.polen_harvests;
 
 -- ================================================================
 -- Migration v2: Unified slot-based rows

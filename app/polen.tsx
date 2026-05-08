@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -6,8 +6,10 @@ import {
   TouchableOpacity,
   View,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
 import * as Crypto from "expo-crypto";
 import Modal from "../components/Modal";
 import Input from "../components/Input";
@@ -20,8 +22,21 @@ import { useApp } from "../context/AppContext";
 import { PolenHarvest } from "../types";
 
 export default function PolenScreen() {
-  const { state, addPolenHarvest, updatePolenHarvest, deletePolenHarvest } = useApp();
+  const { state, loading, addPolenHarvest, updatePolenHarvest, deletePolenHarvest, refreshData } = useApp();
   const harvests = state.polenHarvests || [];
+  const [refreshing, setRefreshing] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshData();
+    }, [refreshData])
+  );
+
+  const handleForceRefresh = async () => {
+    setRefreshing(true);
+    refreshData();
+    setTimeout(() => setRefreshing(false), 1500);
+  };
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingHarvest, setEditingHarvest] = useState<PolenHarvest | null>(null);
@@ -127,6 +142,18 @@ export default function PolenScreen() {
     <View style={commonStyles.screen}>
       {/* Year summary banner */}
       <View style={styles.summaryBanner}>
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={handleForceRefresh}
+          disabled={refreshing || loading}
+          accessibilityLabel="Osvježi podatke"
+        >
+          {refreshing || loading ? (
+            <ActivityIndicator size={18} color={COLORS.primary} />
+          ) : (
+            <Ionicons name="refresh" size={18} color={COLORS.primary} />
+          )}
+        </TouchableOpacity>
         <View style={styles.summaryItem}>
           <Ionicons name="flower-outline" size={22} color={COLORS.primary} />
           <Text style={styles.summaryValue}>{yearStats.count}</Text>
@@ -249,6 +276,7 @@ export default function PolenScreen() {
 const styles = StyleSheet.create({
   summaryBanner: {
     flexDirection: "row",
+    position: "relative",
     backgroundColor: COLORS.surface,
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.lg,
@@ -279,6 +307,17 @@ const styles = StyleSheet.create({
     width: 1,
     height: 40,
     backgroundColor: COLORS.border,
+  },
+  refreshButton: {
+    position: "absolute",
+    top: SPACING.sm,
+    right: SPACING.sm,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.accent.hiveLight,
+    alignItems: "center",
+    justifyContent: "center",
   },
   listContent: {
     padding: SPACING.lg,
