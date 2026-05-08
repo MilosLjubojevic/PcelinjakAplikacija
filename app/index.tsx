@@ -263,6 +263,29 @@ export default function HomeScreen() {
         />
       </View>
 
+      {/* Combined Hives + Swarms */}
+      <TouchableOpacity
+        style={styles.combinedCard}
+        onPress={() => router.push("/hive")}
+        activeOpacity={0.7}
+      >
+        <View style={styles.combinedLeft}>
+          <View style={[styles.statIconContainer, { backgroundColor: COLORS.accent.hiveLight }]}>
+            <Ionicons name="layers" size={20} color={COLORS.accent.hive} />
+          </View>
+          <View>
+            <Text style={styles.combinedLabel}>Ukupno košnica i rojeva</Text>
+            <Text style={styles.combinedBreakdown}>
+              {metrics.totalHives} košnica • {metrics.totalNuclei} rojeva
+            </Text>
+          </View>
+        </View>
+        <View style={styles.combinedRight}>
+          <Text style={styles.combinedValue}>{metrics.totalHives + metrics.totalNuclei}</Text>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+        </View>
+      </TouchableOpacity>
+
       {/* Health Overview */}
       <SectionHeader title="Stanje" />
       <HealthOverview
@@ -409,6 +432,44 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: COLORS.textSecondary,
     textAlign: "center",
+  },
+
+  // ── Combined Card ─────────────────────────────────
+  combinedCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.xxl,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    ...SHADOW.md,
+  },
+  combinedLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+    flex: 1,
+  },
+  combinedRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  combinedLabel: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  combinedBreakdown: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+  },
+  combinedValue: {
+    fontSize: FONT_SIZE.xxl,
+    fontWeight: "700",
+    color: COLORS.accent.hive,
   },
 
   // ── Health Overview ────────────────────────────────
