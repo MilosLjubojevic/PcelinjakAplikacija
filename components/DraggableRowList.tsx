@@ -9,7 +9,7 @@ import Reanimated, {
   runOnJS,
 } from 'react-native-reanimated';
 
-type ItemLayout = { y: number; height: number };
+type ItemLayout = { y: number; height: number }; // y kept for compat but only height is used
 
 type DraggableItemProps = {
   itemId: string;
@@ -55,29 +55,19 @@ function DraggableItem({
           if (activeId.value !== itemId) return;
           dragTranslateY.value = e.translationY;
 
-          const activeLayout = layouts.value[itemId];
-          if (!activeLayout) return;
           const ids = rowIds.value;
           const currentIndex = ids.indexOf(itemId);
           if (currentIndex === -1) return;
 
-          const newCenterY = activeLayout.y + activeLayout.height / 2 + e.translationY;
-          let targetIdx = currentIndex;
+          const activeLayout = layouts.value[itemId];
+          const itemH = activeLayout ? activeLayout.height : 60;
 
-          for (let i = 0; i < ids.length; i++) {
-            const l = layouts.value[ids[i]];
-            if (!l) continue;
-            if (newCenterY >= l.y && newCenterY < l.y + l.height) {
-              targetIdx = i;
-              break;
-            }
-          }
-          if (ids.length > 0) {
-            const firstL = layouts.value[ids[0]];
-            const lastL = layouts.value[ids[ids.length - 1]];
-            if (firstL && newCenterY < firstL.y) targetIdx = 0;
-            if (lastL && newCenterY >= lastL.y + lastL.height) targetIdx = ids.length - 1;
-          }
+          // Index-based targeting: how many item-heights has the finger moved?
+          const rawOffset = e.translationY / itemH;
+          const slotOffset = rawOffset > 0
+            ? Math.floor(rawOffset + 0.4)
+            : -Math.floor(-rawOffset + 0.4);
+          const targetIdx = Math.max(0, Math.min(ids.length - 1, currentIndex + slotOffset));
 
           swapTargetId.value = targetIdx !== currentIndex ? ids[targetIdx] : '';
 
@@ -89,7 +79,7 @@ function DraggableItem({
             const to = Math.max(currentIndex, targetIdx);
             for (let i = from; i <= to; i++) {
               if (ids[i] !== itemId) {
-                newD[ids[i]] = -dir * activeLayout.height;
+                newD[ids[i]] = -dir * itemH;
               }
             }
           }
@@ -99,27 +89,18 @@ function DraggableItem({
           'worklet';
           if (activeId.value !== itemId) return;
 
-          const activeLayout = layouts.value[itemId];
           const ids = rowIds.value;
           const currentIndex = ids.indexOf(itemId);
 
           let targetIdx = currentIndex;
-          if (activeLayout && currentIndex !== -1) {
-            const newCenterY = activeLayout.y + activeLayout.height / 2 + e.translationY;
-            for (let i = 0; i < ids.length; i++) {
-              const l = layouts.value[ids[i]];
-              if (!l) continue;
-              if (newCenterY >= l.y && newCenterY < l.y + l.height) {
-                targetIdx = i;
-                break;
-              }
-            }
-            if (ids.length > 0) {
-              const firstL = layouts.value[ids[0]];
-              const lastL = layouts.value[ids[ids.length - 1]];
-              if (firstL && newCenterY < firstL.y) targetIdx = 0;
-              if (lastL && newCenterY >= lastL.y + lastL.height) targetIdx = ids.length - 1;
-            }
+          if (currentIndex !== -1) {
+            const activeLayout = layouts.value[itemId];
+            const itemH = activeLayout ? activeLayout.height : 60;
+            const rawOffset = e.translationY / itemH;
+            const slotOffset = rawOffset > 0
+              ? Math.floor(rawOffset + 0.4)
+              : -Math.floor(-rawOffset + 0.4);
+            targetIdx = Math.max(0, Math.min(ids.length - 1, currentIndex + slotOffset));
           }
 
           swapTargetId.value = '';
