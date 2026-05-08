@@ -180,20 +180,26 @@ function DraggableItem({
     };
   });
 
+  // onLayout must be on an outer View ABOVE GestureDetector.
+  // GestureDetector creates its own native wrapper, so anything inside it
+  // reports y=0 relative to that wrapper — making all items look co-located
+  // and breaking the swap hit-test. The outer View measures correctly against
+  // the common scroll-content ancestor.
   return (
-    <GestureDetector gesture={gesture}>
-      <Reanimated.View
-        style={animStyle}
-        onLayout={(e) =>
-          onLayoutUpdate(itemId, {
-            y: e.nativeEvent.layout.y,
-            height: e.nativeEvent.layout.height,
-          })
-        }
-      >
-        {children}
-      </Reanimated.View>
-    </GestureDetector>
+    <View
+      onLayout={(e) =>
+        onLayoutUpdate(itemId, {
+          y: e.nativeEvent.layout.y,
+          height: e.nativeEvent.layout.height,
+        })
+      }
+    >
+      <GestureDetector gesture={gesture}>
+        <Reanimated.View style={animStyle}>
+          {children}
+        </Reanimated.View>
+      </GestureDetector>
+    </View>
   );
 }
 
