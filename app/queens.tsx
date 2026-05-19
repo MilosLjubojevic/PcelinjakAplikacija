@@ -357,27 +357,78 @@ export default function QueensScreen() {
     );
   };
 
-  // Quick status toggle: developing -> mature -> remove (1st tap starts timer via slot press)
-  const handleQuickStatusToggle = async (rowId: string, box: QueenBox) => {
-    const row = queenBoxRows.find((r) => r.id === rowId);
-    if (!row) return;
+  const handleOpenQuickActionModal = (rowId: string, box: QueenBox) => {
+    setQuickActionBox(box);
+    setQuickActionRowId(rowId);
+    setQuickActionNotes(box.notes || "");
+    setQuickActionModalVisible(true);
+  };
 
-    if (box.status === "developing") {
-      // 2nd tap: mark as mature/ready
-      const updatedBox: QueenBox = {
-        ...box,
-        status: "mature",
-        updatedAt: new Date(),
-      };
-      const updatedBoxes = row.queenBoxes.map((b) =>
-        b.id === box.id ? updatedBox : b
-      );
-      updateQueenBoxRow(rowId, { queenBoxes: updatedBoxes });
-    } else if (box.status === "mature") {
-      // 3rd tap: remove the box entirely
-      const updatedBoxes = row.queenBoxes.filter((b) => b.id !== box.id);
-      updateQueenBoxRow(rowId, { queenBoxes: updatedBoxes });
-    }
+  const handleSaveQuickNote = async () => {
+    if (!quickActionBox || !quickActionRowId) return;
+    const row = queenBoxRows.find((r) => r.id === quickActionRowId);
+    if (!row) return;
+    const updatedBox: QueenBox = { ...quickActionBox, notes: quickActionNotes || undefined, updatedAt: new Date() };
+    await updateQueenBoxRow(quickActionRowId, {
+      queenBoxes: row.queenBoxes.map((b) => b.id === quickActionBox.id ? updatedBox : b),
+    });
+    setQuickActionModalVisible(false);
+    showToast(`Bilješka sačuvana za oplodnjak ${quickActionBox.number}`);
+  };
+
+  const handleResetTimer = async () => {
+    if (!quickActionBox || !quickActionRowId) return;
+    const row = queenBoxRows.find((r) => r.id === quickActionRowId);
+    if (!row) return;
+    const now = new Date();
+    const updatedBox: QueenBox = {
+      ...quickActionBox,
+      status: "developing",
+      startDate: now,
+      maturityDate: new Date(now.getTime() + 25 * 24 * 60 * 60 * 1000),
+      updatedAt: now,
+    };
+    await updateQueenBoxRow(quickActionRowId, {
+      queenBoxes: row.queenBoxes.map((b) => b.id === quickActionBox.id ? updatedBox : b),
+    });
+    setQuickActionModalVisible(false);
+    showToast(`Tajmer resetovan za oplodnjak ${quickActionBox.number}`);
+  };
+
+  const handleToggleUpitno = async () => {
+    if (!quickActionBox || !quickActionRowId) return;
+    const row = queenBoxRows.find((r) => r.id === quickActionRowId);
+    if (!row) return;
+    const newHealth: QueenBoxHealth = quickActionBox.health === "warning" ? "good" : "warning";
+    const updatedBox: QueenBox = { ...quickActionBox, health: newHealth, updatedAt: new Date() };
+    await updateQueenBoxRow(quickActionRowId, {
+      queenBoxes: row.queenBoxes.map((b) => b.id === quickActionBox.id ? updatedBox : b),
+    });
+    setQuickActionModalVisible(false);
+    showToast(newHealth === "warning" ? `Oplodnjak ${quickActionBox.number} označen kao Upitno` : `Oplodnjak ${quickActionBox.number} označen kao Dobro`);
+  };
+
+  const handleQuickDeleteBox = () => {
+    if (!quickActionBox || !quickActionRowId) return;
+    Alert.alert(
+      "Obriši Oplodnjak",
+      `Da li ste sigurni da želite da obrišete oplodnjak ${quickActionBox.number}?`,
+      [
+        { text: "Otkaži", style: "cancel" },
+        {
+          text: "Obriši",
+          style: "destructive",
+          onPress: async () => {
+            const row = queenBoxRows.find((r) => r.id === quickActionRowId);
+            if (!row) return;
+            await updateQueenBoxRow(quickActionRowId, {
+              queenBoxes: row.queenBoxes.filter((b) => b.id !== quickActionBox.id),
+            });
+            setQuickActionModalVisible(false);
+          },
+        },
+      ]
+    );
   };
 
   const toggleRow = (rowId: string) => {
@@ -393,7 +444,7 @@ export default function QueensScreen() {
       case "good":
         return COLORS.primary;
       case "warning":
-        return COLORS.danger;
+        return COLORS.accent.swarm;
       default:
         return COLORS.textMuted;
     }
@@ -447,6 +498,10 @@ export default function QueensScreen() {
   const [editModeRows, setEditModeRows] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDraggingRows, setIsDraggingRows] = useState(false);
+  const [quickActionModalVisible, setQuickActionModalVisible] = useState(false);
+  const [quickActionBox, setQuickActionBox] = useState<QueenBox | null>(null);
+  const [quickActionRowId, setQuickActionRowId] = useState<string | null>(null);
+  const [quickActionNotes, setQuickActionNotes] = useState("");
 
   const handleRowsReorder = useCallback(async (reorderedRows: QueenBoxRow[]) => {
     await reorderQueenBoxRows(reorderedRows);
@@ -466,7 +521,7 @@ export default function QueensScreen() {
   const searchedRows = searchQuery
     ? filteredRows.filter(row =>
         row.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        row.queenBoxes.some(b => b.number.toString().includes(searchQuery))
+        row.queenBoxes.some(b => b.number === parseInt(searchQuery))
       )
     : filteredRows;
 
@@ -584,8 +639,8 @@ export default function QueensScreen() {
           <Text style={styles.legendLabel}>Dani do zrelosti</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendSwatch, { borderColor: COLORS.danger }]} />
-          <Text style={styles.legendLabel}>Zahtijeva pažnju</Text>
+          <View style={[styles.legendSwatch, { borderColor: COLORS.accent.swarm, backgroundColor: COLORS.accent.swarmLight }]} />
+          <Text style={styles.legendLabel}>Upitno</Text>
         </View>
       </View>
 
@@ -662,12 +717,13 @@ export default function QueensScreen() {
                               { borderColor: box.status === "mature" ? COLORS.success : getHealthColor(box.health) },
                               box.status === "empty" && styles.queenBoxEmpty,
                               box.status === "mature" && styles.queenBoxMature,
+                              box.health === "warning" && box.status !== "mature" && styles.queenBoxUpitno,
                               editModeRows.includes(row.id) && styles.queenBoxEditMode,
                             ]}
                             onPress={() =>
                               editModeRows.includes(row.id)
                                 ? openEditBoxModal(box, row.id)
-                                : handleQuickStatusToggle(row.id, box)
+                                : handleOpenQuickActionModal(row.id, box)
                             }
                             onLongPress={() => openEditBoxModal(box, row.id)}
                             accessibilityLabel={`Oplodnjak ${box.number}, ${box.status === 'empty' ? 'prazan' : box.status === 'developing' ? 'u razvoju' : 'zreo'}`}
@@ -789,6 +845,77 @@ export default function QueensScreen() {
       <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
         <Ionicons name="add" size={28} color={COLORS.surface} />
       </TouchableOpacity>
+
+      {/* Quick Action Modal */}
+      <Modal
+        visible={quickActionModalVisible}
+        onClose={() => setQuickActionModalVisible(false)}
+        title={`Oplodnjak ${quickActionBox?.number ?? ""}`}
+      >
+        <View style={styles.quickActionList}>
+          <TouchableOpacity style={styles.quickActionItem} onPress={handleResetTimer}>
+            <View style={[styles.quickActionIcon, { backgroundColor: COLORS.infoLight }]}>
+              <Ionicons name="refresh-circle-outline" size={24} color={COLORS.info} />
+            </View>
+            <View style={styles.quickActionTextWrap}>
+              <Text style={styles.quickActionTitle}>Resetuj tajmer</Text>
+              <Text style={styles.quickActionDesc}>Počinje tajmer od 25 dana od danas</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickActionItem} onPress={handleToggleUpitno}>
+            <View style={[styles.quickActionIcon, { backgroundColor: COLORS.accent.swarmLight }]}>
+              <Ionicons name="help-circle-outline" size={24} color={COLORS.accent.swarm} />
+            </View>
+            <View style={styles.quickActionTextWrap}>
+              <Text style={styles.quickActionTitle}>
+                {quickActionBox?.health === "warning" ? "Ukloni oznaku Upitno" : "Označi kao Upitno"}
+              </Text>
+              <Text style={styles.quickActionDesc}>
+                {quickActionBox?.health === "warning" ? "Vrati status na Dobro" : "Označi oplodnjak kao upitan"}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.quickActionItem, styles.quickActionItemDanger]} onPress={handleQuickDeleteBox}>
+            <View style={[styles.quickActionIcon, { backgroundColor: COLORS.dangerLight }]}>
+              <Ionicons name="trash-outline" size={24} color={COLORS.danger} />
+            </View>
+            <View style={styles.quickActionTextWrap}>
+              <Text style={[styles.quickActionTitle, { color: COLORS.danger }]}>Obriši oplodnjak</Text>
+              <Text style={styles.quickActionDesc}>Trajno ukloni ovaj oplodnjak</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.quickActionDivider} />
+
+        <Input
+          label="Bilješka"
+          value={quickActionNotes}
+          onChangeText={setQuickActionNotes}
+          placeholder="Dodaj bilješku za ovaj oplodnjak..."
+          multiline
+          numberOfLines={3}
+        />
+
+        <View style={styles.modalButtons}>
+          <Button
+            title="Zatvori"
+            onPress={() => setQuickActionModalVisible(false)}
+            variant="secondary"
+            style={{ flex: 1, marginRight: SPACING.sm }}
+          />
+          <Button
+            title="Sačuvaj bilješku"
+            onPress={handleSaveQuickNote}
+            style={{ flex: 1, marginLeft: SPACING.sm }}
+          />
+        </View>
+      </Modal>
 
       {/* Edit Row Modal */}
       <Modal
@@ -1404,6 +1531,51 @@ const styles = StyleSheet.create({
   queenBoxEditMode: {
     opacity: 0.85,
     borderStyle: "dashed",
+  },
+  queenBoxUpitno: {
+    backgroundColor: COLORS.accent.swarmLight,
+  },
+  quickActionList: {
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  quickActionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.borderMedium,
+  },
+  quickActionItemDanger: {
+    borderColor: COLORS.dangerLight,
+  },
+  quickActionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickActionTextWrap: {
+    flex: 1,
+  },
+  quickActionTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+  },
+  quickActionDesc: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  quickActionDivider: {
+    height: 1,
+    backgroundColor: COLORS.borderMedium,
+    marginVertical: SPACING.md,
   },
   rowActionButtonSave: {
     backgroundColor: COLORS.success,

@@ -348,12 +348,18 @@ export default function HivesScreen() {
     if (!editingHive || !currentLocation) return;
     setSaving(true);
 
+    const existingNotes = editingHive.notes || [];
+    const newNotes = swarmFormData.notes.trim()
+      ? [...existingNotes, { id: Crypto.randomUUID(), text: swarmFormData.notes.trim(), createdAt: new Date() } as HiveNote]
+      : existingNotes;
+
     const updatedHive: Hive = {
       ...editingHive,
       health: swarmFormData.health,
       swarmStatus: swarmFormData.swarmStatus,
       swarmStartDate: swarmFormData.swarmStartDate || undefined,
       isActive: swarmFormData.isActive,
+      notes: newNotes,
       updatedAt: new Date(),
     };
 
@@ -502,6 +508,115 @@ export default function HivesScreen() {
     rowId: string;
     rowName: string;
   } | null>(null);
+  const [selectionMode, setSelectionMode] = useState<string | null>(null);
+  const [selectedHiveIds, setSelectedHiveIds] = useState<Set<string>>(new Set());
+  const [bulkModalVisible, setBulkModalVisible] = useState(false);
+  const [bulkForm, setBulkForm] = useState<{
+    applyType: boolean;
+    type: HiveType;
+    applyHealth: boolean;
+    health: HiveHealth;
+    applyFeedingDate: boolean;
+    feedingDate: Date | null;
+    applyHarvestDate: boolean;
+    harvestDate: Date | null;
+    applyNote: boolean;
+    noteText: string;
+  }>({
+    applyType: false,
+    type: 'swarm',
+    applyHealth: false,
+    health: 'bad',
+    applyFeedingDate: false,
+    feedingDate: null,
+    applyHarvestDate: false,
+    harvestDate: null,
+    applyNote: false,
+    noteText: '',
+  });
+
+  const handleBulkApply = async () => {
+    if (!currentLocation || selectedHiveIds.size === 0) return;
+    setSaving(true);
+    const now = new Date();
+
+    const updatedRows = currentLocation.rows.map((row) => ({
+      ...row,
+      hives: row.hives.map((hive) => {
+        if (!selectedHiveIds.has(hive.id)) return hive;
+        let updated: Hive = { ...hive, updatedAt: now };
+
+        if (bulkForm.applyType) {
+          if (bulkForm.type === 'swarm') {
+            updated = {
+              ...updated,
+              type: 'swarm',
+              swarmStatus: 'empty' as SwarmStatus,
+              hasQueen: undefined,
+              queenId: undefined,
+              frameCount: undefined,
+              isHarvested: undefined,
+              hasPollen: undefined,
+              feedingDates: undefined,
+              harvestDates: undefined,
+              lastFeedingDate: undefined,
+              lastHarvestDate: undefined,
+              lastInspection: undefined,
+            };
+          } else {
+            updated = {
+              ...updated,
+              type: 'hive',
+              hasQueen: true,
+              frameCount: 10,
+              swarmStatus: undefined,
+              swarmStartDate: undefined,
+            };
+          }
+        }
+
+        if (bulkForm.applyHealth) {
+          updated = { ...updated, health: bulkForm.health };
+        }
+
+        if (bulkForm.applyFeedingDate && bulkForm.feedingDate && updated.type === 'hive') {
+          const existing = updated.feedingDates || [];
+          const newDates = [...existing, bulkForm.feedingDate].sort((a, b) => b.getTime() - a.getTime());
+          updated = { ...updated, feedingDates: newDates, lastFeedingDate: newDates[0] };
+        }
+
+        if (bulkForm.applyHarvestDate && bulkForm.harvestDate && updated.type === 'hive') {
+          const existing = updated.harvestDates || [];
+          const newDates = [...existing, bulkForm.harvestDate].sort((a, b) => b.getTime() - a.getTime());
+          updated = { ...updated, harvestDates: newDates, lastHarvestDate: newDates[0], isHarvested: true };
+        }
+
+        if (bulkForm.applyNote && bulkForm.noteText.trim()) {
+          const newNote: HiveNote = {
+            id: Crypto.randomUUID(),
+            text: bulkForm.noteText.trim(),
+            createdAt: now,
+          };
+          updated = { ...updated, notes: [...(updated.notes || []), newNote] };
+        }
+
+        return updated;
+      }),
+    }));
+
+    await updateLocation(currentLocation.id, { rows: updatedRows });
+    setSaving(false);
+    setBulkModalVisible(false);
+    setSelectionMode(null);
+    setSelectedHiveIds(new Set());
+    setBulkForm({
+      applyType: false, type: 'swarm',
+      applyHealth: false, health: 'bad',
+      applyFeedingDate: false, feedingDate: null,
+      applyHarvestDate: false, harvestDate: null,
+      applyNote: false, noteText: '',
+    });
+  };
 
   const handleRowsReorder = useCallback(async (reorderedRows: HiveRow[]) => {
     if (!currentLocation) return;
@@ -712,6 +827,31 @@ export default function HivesScreen() {
               {/* Hives Grid (shown when expanded) */}
               {isExpanded && (
                 <View style={styles.expandedContent}>
+                  {selectionMode === row.id && (
+                    <View style={styles.selectionBanner}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const allIds = row.hives.map((h) => h.id);
+                          const allSelected = allIds.every((id) => selectedHiveIds.has(id));
+                          setSelectedHiveIds(allSelected ? new Set() : new Set(allIds));
+                        }}
+                      >
+                        <Text style={styles.selectionBannerLink}>
+                          {row.hives.length > 0 && row.hives.every((h) => selectedHiveIds.has(h.id))
+                            ? 'Odznači sve'
+                            : 'Odaberi sve'}
+                        </Text>
+                      </TouchableOpacity>
+                      <Text style={styles.selectionCount}>{selectedHiveIds.size} odabrano</Text>
+                      <TouchableOpacity
+                        style={[styles.selectionApplyBtn, selectedHiveIds.size === 0 && { opacity: 0.4 }]}
+                        onPress={() => { if (selectedHiveIds.size > 0) setBulkModalVisible(true); }}
+                      >
+                        <Text style={styles.selectionApplyText}>Primijeni</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
                   <View style={styles.hivesGrid}>
                     {Array.from({ length: row.capacity }, (_, i) => i + 1).map((slotNum) => {
                       const hive = row.hives.find((h) => h.number === slotNum);
@@ -739,6 +879,7 @@ export default function HivesScreen() {
                       const isInactive = hive.isActive === false;
                       const isSwarm = hive.type === 'swarm';
 
+                      const isSelected = selectionMode === row.id && selectedHiveIds.has(hive.id);
                       return (
                         <TouchableOpacity
                           key={hive.id}
@@ -749,11 +890,26 @@ export default function HivesScreen() {
                               ? { borderColor: getSwarmStatusColor(hive.swarmStatus || 'empty'), backgroundColor: getSwarmStatusBg(hive.swarmStatus || 'empty') }
                               : { borderColor: getHealthColor(hive.health), backgroundColor: getHealthBg(hive.health) },
                             isInactive && styles.hiveBoxInactive,
+                            isSelected && styles.hiveBoxSelected,
                           ]}
-                          onPress={() => openEditHiveModal(hive, row.id)}
-                          onLongPress={() => handleRemoveSlot(row.id, hive.id, hive.number, hive.type)}
+                          onPress={() => {
+                            if (selectionMode === row.id) {
+                              setSelectedHiveIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(hive.id)) next.delete(hive.id);
+                                else next.add(hive.id);
+                                return next;
+                              });
+                            } else {
+                              openEditHiveModal(hive, row.id);
+                            }
+                          }}
+                          onLongPress={() => {
+                            if (selectionMode === row.id) return;
+                            handleRemoveSlot(row.id, hive.id, hive.number, hive.type);
+                          }}
                           accessibilityLabel={`${isSwarm ? 'Roj' : 'Košnica'} ${hive.number}`}
-                          accessibilityHint="Pritisni za izmjenu, dugo drži za brisanje"
+                          accessibilityHint={selectionMode === row.id ? "Pritisni za odabir" : "Pritisni za izmjenu, dugo drži za brisanje"}
                         >
                           <Text
                             style={[
@@ -803,6 +959,11 @@ export default function HivesScreen() {
                               style={styles.inactiveIcon}
                             />
                           )}
+                          {isSelected && (
+                            <View style={[styles.selectionOverlay, { borderRadius: hiveBoxSize * 0.16 }]}>
+                              <Ionicons name="checkmark" size={hiveBoxSize * 0.45} color={COLORS.surface} />
+                            </View>
+                          )}
                         </TouchableOpacity>
                       );
                     })}
@@ -817,6 +978,27 @@ export default function HivesScreen() {
                       <Ionicons name="create-outline" size={SPACING.xl} color={COLORS.primary} />
                       <Text style={[styles.rowActionText, { color: COLORS.primary }]}>
                         Uredi red
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.rowActionButton}
+                      onPress={() => {
+                        if (selectionMode === row.id) {
+                          setSelectionMode(null);
+                          setSelectedHiveIds(new Set());
+                        } else {
+                          setSelectionMode(row.id);
+                          setSelectedHiveIds(new Set());
+                        }
+                      }}
+                    >
+                      <Ionicons
+                        name={selectionMode === row.id ? "close-circle-outline" : "checkmark-done-outline"}
+                        size={SPACING.xl}
+                        color={selectionMode === row.id ? COLORS.textMuted : COLORS.success}
+                      />
+                      <Text style={[styles.rowActionText, { color: selectionMode === row.id ? COLORS.textMuted : COLORS.success }]}>
+                        {selectionMode === row.id ? 'Otkaži' : 'Odaberi'}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -1388,6 +1570,150 @@ export default function HivesScreen() {
         onCancel={() => setDeleteRowConfirm(null)}
       />
 
+      {/* Bulk Edit Modal */}
+      <Modal
+        visible={bulkModalVisible}
+        onClose={() => setBulkModalVisible(false)}
+        title={`Grupno ažuriranje (${selectedHiveIds.size})`}
+      >
+        {/* Type change */}
+        <TouchableOpacity
+          style={[styles.bulkToggleRow, bulkForm.applyType && styles.bulkToggleRowActive]}
+          onPress={() => setBulkForm({ ...bulkForm, applyType: !bulkForm.applyType })}
+        >
+          <View style={[styles.bulkCheckbox, bulkForm.applyType && styles.bulkCheckboxActive]}>
+            {bulkForm.applyType && <Ionicons name="checkmark" size={12} color={COLORS.surface} />}
+          </View>
+          <Text style={styles.bulkToggleLabel}>Promijeni tip</Text>
+        </TouchableOpacity>
+        {bulkForm.applyType && (
+          <View style={styles.typeSwitcherContainer}>
+            <TouchableOpacity
+              style={[styles.typeSwitcherOption, bulkForm.type === 'hive' && styles.typeSwitcherOptionActive, bulkForm.type === 'hive' && { borderColor: COLORS.accent.hive }]}
+              onPress={() => setBulkForm({ ...bulkForm, type: 'hive' })}
+            >
+              <Ionicons name="grid-outline" size={18} color={bulkForm.type === 'hive' ? COLORS.accent.hive : COLORS.textMuted} />
+              <Text style={[styles.typeSwitcherLabel, { color: bulkForm.type === 'hive' ? COLORS.accent.hive : COLORS.textMuted }]}>Košnica</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.typeSwitcherOption, bulkForm.type === 'swarm' && styles.typeSwitcherOptionActive, bulkForm.type === 'swarm' && { borderColor: COLORS.accent.swarm }]}
+              onPress={() => setBulkForm({ ...bulkForm, type: 'swarm' })}
+            >
+              <Ionicons name="cube-outline" size={18} color={bulkForm.type === 'swarm' ? COLORS.accent.swarm : COLORS.textMuted} />
+              <Text style={[styles.typeSwitcherLabel, { color: bulkForm.type === 'swarm' ? COLORS.accent.swarm : COLORS.textMuted }]}>Roj</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Health */}
+        <TouchableOpacity
+          style={[styles.bulkToggleRow, bulkForm.applyHealth && styles.bulkToggleRowActive]}
+          onPress={() => setBulkForm({ ...bulkForm, applyHealth: !bulkForm.applyHealth })}
+        >
+          <View style={[styles.bulkCheckbox, bulkForm.applyHealth && styles.bulkCheckboxActive]}>
+            {bulkForm.applyHealth && <Ionicons name="checkmark" size={12} color={COLORS.surface} />}
+          </View>
+          <Text style={styles.bulkToggleLabel}>Zdravlje košnice</Text>
+        </TouchableOpacity>
+        {bulkForm.applyHealth && (
+          <View style={styles.typeSwitcherContainer}>
+            <TouchableOpacity
+              style={[styles.typeSwitcherOption, bulkForm.health === 'good' && styles.typeSwitcherOptionActive, bulkForm.health === 'good' && { borderColor: '#16A34A' }]}
+              onPress={() => setBulkForm({ ...bulkForm, health: 'good' })}
+            >
+              <View style={[styles.legendSwatch, { borderColor: '#16A34A', backgroundColor: '#DCFCE7' }]} />
+              <Text style={[styles.typeSwitcherLabel, { color: bulkForm.health === 'good' ? '#16A34A' : COLORS.textMuted }]}>Dobro</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.typeSwitcherOption, bulkForm.health === 'bad' && styles.typeSwitcherOptionActive, bulkForm.health === 'bad' && { borderColor: '#DC2626' }]}
+              onPress={() => setBulkForm({ ...bulkForm, health: 'bad' })}
+            >
+              <View style={[styles.legendSwatch, { borderColor: '#DC2626', backgroundColor: '#FEE2E2' }]} />
+              <Text style={[styles.typeSwitcherLabel, { color: bulkForm.health === 'bad' ? '#DC2626' : COLORS.textMuted }]}>Loše</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.typeSwitcherOption, bulkForm.health === 'warning' && styles.typeSwitcherOptionActive, bulkForm.health === 'warning' && { borderColor: '#D97706' }]}
+              onPress={() => setBulkForm({ ...bulkForm, health: 'warning' as HiveHealth })}
+            >
+              <View style={[styles.legendSwatch, { borderColor: '#D97706', backgroundColor: '#FEF3C7' }]} />
+              <Text style={[styles.typeSwitcherLabel, { color: bulkForm.health === 'warning' ? '#D97706' : COLORS.textMuted }]}>Upozorenje</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Feeding date */}
+        <TouchableOpacity
+          style={[styles.bulkToggleRow, bulkForm.applyFeedingDate && styles.bulkToggleRowActive]}
+          onPress={() => setBulkForm({ ...bulkForm, applyFeedingDate: !bulkForm.applyFeedingDate })}
+        >
+          <View style={[styles.bulkCheckbox, bulkForm.applyFeedingDate && styles.bulkCheckboxActive]}>
+            {bulkForm.applyFeedingDate && <Ionicons name="checkmark" size={12} color={COLORS.surface} />}
+          </View>
+          <Text style={styles.bulkToggleLabel}>Dodaj prihranu (košnice)</Text>
+        </TouchableOpacity>
+        {bulkForm.applyFeedingDate && (
+          <DatePicker
+            label="Datum prihrane"
+            value={bulkForm.feedingDate}
+            onChange={(date) => setBulkForm({ ...bulkForm, feedingDate: date })}
+          />
+        )}
+
+        {/* Harvest date */}
+        <TouchableOpacity
+          style={[styles.bulkToggleRow, bulkForm.applyHarvestDate && styles.bulkToggleRowActive]}
+          onPress={() => setBulkForm({ ...bulkForm, applyHarvestDate: !bulkForm.applyHarvestDate })}
+        >
+          <View style={[styles.bulkCheckbox, bulkForm.applyHarvestDate && styles.bulkCheckboxActive]}>
+            {bulkForm.applyHarvestDate && <Ionicons name="checkmark" size={12} color={COLORS.surface} />}
+          </View>
+          <Text style={styles.bulkToggleLabel}>Dodaj vrcanje (košnice)</Text>
+        </TouchableOpacity>
+        {bulkForm.applyHarvestDate && (
+          <DatePicker
+            label="Datum vrcanja"
+            value={bulkForm.harvestDate}
+            onChange={(date) => setBulkForm({ ...bulkForm, harvestDate: date })}
+          />
+        )}
+
+        {/* Note */}
+        <TouchableOpacity
+          style={[styles.bulkToggleRow, bulkForm.applyNote && styles.bulkToggleRowActive]}
+          onPress={() => setBulkForm({ ...bulkForm, applyNote: !bulkForm.applyNote })}
+        >
+          <View style={[styles.bulkCheckbox, bulkForm.applyNote && styles.bulkCheckboxActive]}>
+            {bulkForm.applyNote && <Ionicons name="checkmark" size={12} color={COLORS.surface} />}
+          </View>
+          <Text style={styles.bulkToggleLabel}>Dodaj bilješku</Text>
+        </TouchableOpacity>
+        {bulkForm.applyNote && (
+          <Input
+            value={bulkForm.noteText}
+            onChangeText={(text) => setBulkForm({ ...bulkForm, noteText: text })}
+            placeholder="Tekst bilješke za sve odabrane..."
+            multiline
+            numberOfLines={3}
+          />
+        )}
+
+        <View style={styles.modalButtons}>
+          <Button
+            title="Otkaži"
+            onPress={() => setBulkModalVisible(false)}
+            variant="secondary"
+            style={{ flex: 1, marginRight: SPACING.sm }}
+          />
+          <Button
+            title="Primijeni"
+            onPress={handleBulkApply}
+            loading={saving}
+            disabled={!bulkForm.applyType && !bulkForm.applyHealth && !bulkForm.applyFeedingDate && !bulkForm.applyHarvestDate && !bulkForm.applyNote}
+            style={{ flex: 1, marginLeft: SPACING.sm }}
+          />
+        </View>
+      </Modal>
+
       {/* Edit Swarm Modal */}
       <Modal
         visible={editSwarmModalVisible}
@@ -1497,6 +1823,14 @@ export default function HivesScreen() {
               <View style={[styles.switchThumb, swarmFormData.isActive && styles.switchThumbActive]} />
             </TouchableOpacity>
           </View>
+
+          <Input
+            label="Bilješka"
+            value={swarmFormData.notes}
+            onChangeText={(text) => setSwarmFormData({ ...swarmFormData, notes: text })}
+            placeholder="Dodaj bilješku..."
+            multiline
+          />
         </View>
 
         <View style={styles.modalButtons}>
@@ -1975,5 +2309,85 @@ const styles = StyleSheet.create({
   legendLabel: {
     fontSize: FONT_SIZE.xs,
     color: COLORS.textSecondary,
+  },
+  hiveBoxSelected: {
+    borderColor: COLORS.primary,
+    borderWidth: 3,
+  },
+  selectionOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  selectionBannerLink: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  selectionCount: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  selectionApplyBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.md,
+  },
+  selectionApplyText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.surface,
+  },
+  bulkToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.xs,
+    borderWidth: 1,
+    borderColor: COLORS.borderMedium,
+    backgroundColor: COLORS.background,
+  },
+  bulkToggleRowActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
+  },
+  bulkCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: RADIUS.sm,
+    borderWidth: 2,
+    borderColor: COLORS.borderMedium,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.background,
+  },
+  bulkCheckboxActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
+  },
+  bulkToggleLabel: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    flex: 1,
   },
 });

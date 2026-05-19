@@ -491,3 +491,80 @@ END $$;
 -- Drop swarm tables after migration
 DROP TABLE IF EXISTS swarm_boxes;
 DROP TABLE IF EXISTS swarm_box_rows;
+
+-- ================================================================
+-- Migration v3: Shared data access — only allowed_emails can read/write
+-- All app data is visible to every allowed account (no per-user isolation).
+-- Run this entire block in Supabase SQL Editor.
+-- ================================================================
+
+-- 1. allowed_emails:
+--    • Any authenticated user can SELECT (needed for the subquery in other tables' RLS)
+--    • Only users already in the list can INSERT / DELETE entries
+alter table public.allowed_emails enable row level security;
+
+drop policy if exists "allowed_emails_select"  on public.allowed_emails;
+drop policy if exists "allowed_emails_insert"  on public.allowed_emails;
+drop policy if exists "allowed_emails_delete"  on public.allowed_emails;
+
+create policy "allowed_emails_select"
+  on public.allowed_emails for select to authenticated
+  using (true);
+
+create policy "allowed_emails_insert"
+  on public.allowed_emails for insert to authenticated
+  with check (
+    exists (select 1 from public.allowed_emails where email = auth.email())
+  );
+
+create policy "allowed_emails_delete"
+  on public.allowed_emails for delete to authenticated
+  using (
+    exists (select 1 from public.allowed_emails where email = auth.email())
+  );
+
+-- 2. All 16 app tables: drop old policies, create shared-access policy.
+--    Any allowed email can read and write ALL rows (no user_id isolation).
+
+do $$
+declare
+  tbl text;
+  app_tables text[] := array[
+    'locations', 'hive_rows', 'hives', 'hive_notes',
+    'hive_feeding_dates', 'hive_harvest_dates',
+    'queens', 'queen_box_rows', 'queen_boxes',
+    'nuclei', 'sales', 'sale_items',
+    'expenses', 'incomes', 'notes', 'polen_harvests',
+    'products', 'product_price_options', 'orders', 'order_items'
+  ];
+  old_policies text[] := array[
+    'Users manage own locations',      'Users manage own hive_rows',
+    'Users manage own hives',          'Users manage own hive_notes',
+    'Users manage own hive_feeding_dates', 'Users manage own hive_harvest_dates',
+    'Users manage own queens',         'Users manage own queen_box_rows',
+    'Users manage own queen_boxes',    'Users manage own nuclei',
+    'Users manage own sales',          'Users manage own sale_items',
+    'Users manage own expenses',       'Users manage own incomes',
+    'Users manage own notes',          'Users manage own polen harvests',
+    'Shared access for allowed users'
+  ];
+  pol text;
+begin
+  foreach tbl in array app_tables loop
+    -- Skip tables that don't exist in this database
+    if not exists (select 1 from pg_tables where schemaname = 'public' and tablename = tbl) then
+      continue;
+    end if;
+    -- Drop all known old policy names
+    foreach pol in array old_policies loop
+      execute format('drop policy if exists %I on public.%I', pol, tbl);
+    end loop;
+    -- Create new shared-access policy
+    execute format($f$
+      create policy "Shared access for allowed users"
+        on public.%I for all to authenticated
+        using  (exists (select 1 from public.allowed_emails where email = auth.email()))
+        with check (exists (select 1 from public.allowed_emails where email = auth.email()))
+    $f$, tbl);
+  end loop;
+end $$;
