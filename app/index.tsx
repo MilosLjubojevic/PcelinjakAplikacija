@@ -1,72 +1,72 @@
-import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import React from "react";
 import {
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import AppText from "../components/AppText";
+import Button from "../components/Button";
+import { DashboardSkeleton } from "../components/SkeletonLoader";
+import WeatherWidget from "../components/WeatherWidget";
+import {
+  COLORS,
+  FONT_SIZE,
+  RADIUS,
+  SHADOW,
+  SPACING,
+} from "../constants/designTokens";
 import { useApp } from "../context/AppContext";
 import { formatCurrencyShort } from "../utils/currency";
-import WeatherWidget from "../components/WeatherWidget";
-import { DashboardSkeleton } from "../components/SkeletonLoader";
-import Button from "../components/Button";
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from "../constants/designTokens";
 
-// ─── Sub-Components ─────────────────────────────────────────────
+// ─── Hero Stat Card (2×2 grid) ──────────────────────────────────
 
-function GreetingHeader() {
-  const hour = new Date().getHours();
-  let greeting = "Dobro jutro";
-  if (hour >= 12 && hour < 18) greeting = "Dobar dan";
-  if (hour >= 18) greeting = "Dobro veče";
-
-  const today = new Date().toLocaleDateString("sr-Latn-RS", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-
-  return (
-    <View style={styles.greetingContainer}>
-      <Text style={styles.greetingText}>{greeting} 🐝</Text>
-      <Text style={styles.dateText}>{today}</Text>
-    </View>
-  );
-}
-
-function SectionHeader({ title }: { title: string }) {
-  return <Text style={styles.sectionTitle}>{title}</Text>;
-}
-
-interface StatCardProps {
+interface HeroStatProps {
   icon: keyof typeof Ionicons.glyphMap;
-  value: number;
+  value: string | number;
   label: string;
+  chip?: string;
   iconColor: string;
   iconBg: string;
+  accentColor: string;
   onPress: () => void;
 }
 
-function StatCard({ icon, value, label, iconColor, iconBg, onPress }: StatCardProps) {
+function HeroStat({
+  icon,
+  value,
+  label,
+  chip,
+  iconColor,
+  iconBg,
+  accentColor,
+  onPress,
+}: HeroStatProps) {
   return (
     <TouchableOpacity
-      style={styles.statCard}
+      style={[styles.heroStat, { borderTopColor: accentColor }]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.75}
     >
-      <View style={[styles.statIconContainer, { backgroundColor: iconBg }]}>
-        <Ionicons name={icon} size={20} color={iconColor} />
+      <View style={styles.heroStatTop}>
+        <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
+          <Ionicons name={icon} size={18} color={iconColor} />
+        </View>
+        {chip ? (
+          <View style={[styles.chip, { backgroundColor: iconBg }]}>
+            <AppText style={[styles.chipText, { color: iconColor }]} maxFontSizeMultiplier={1} adjustsFontSizeToFit numberOfLines={1}>{chip}</AppText>
+          </View>
+        ) : null}
       </View>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel} numberOfLines={1}>
-        {label}
-      </Text>
+      <AppText style={styles.heroStatValue} maxFontSizeMultiplier={1.2} adjustsFontSizeToFit numberOfLines={1}>{value}</AppText>
+      <AppText style={styles.heroStatLabel} maxFontSizeMultiplier={1} adjustsFontSizeToFit numberOfLines={1}>{label}</AppText>
     </TouchableOpacity>
   );
 }
+
+// ─── Quick Action Tile ───────────────────────────────────────────
 
 interface QuickActionProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -76,111 +76,96 @@ interface QuickActionProps {
   bgColor: string;
 }
 
-function QuickActionCard({ icon, label, onPress, color, bgColor }: QuickActionProps) {
+function QuickActionTile({
+  icon,
+  label,
+  onPress,
+  color,
+  bgColor,
+}: QuickActionProps) {
   return (
     <TouchableOpacity
-      style={styles.quickAction}
+      style={styles.quickTile}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.75}
     >
-      <View style={[styles.quickActionIcon, { backgroundColor: bgColor }]}>
+      <View style={[styles.quickTileIcon, { backgroundColor: bgColor }]}>
         <Ionicons name={icon} size={22} color={color} />
       </View>
-      <Text style={styles.quickActionLabel} numberOfLines={2}>
+      <AppText style={styles.quickTileLabel} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.2}>
         {label}
-      </Text>
-      <Ionicons
-        name="chevron-forward"
-        size={14}
-        color={COLORS.textMuted}
-        style={styles.quickActionChevron}
-      />
+      </AppText>
     </TouchableOpacity>
   );
 }
 
-interface HealthOverviewProps {
+// ─── Health Card ─────────────────────────────────────────────────
+
+interface HealthCardProps {
   healthy: number;
   needsAttention: number;
   total: number;
 }
 
-function HealthOverview({ healthy, needsAttention, total }: HealthOverviewProps) {
-  const healthPercent = total > 0 ? (healthy / total) * 100 : 0;
+function HealthCard({ healthy, needsAttention, total }: HealthCardProps) {
+  const pct = total > 0 ? Math.round((healthy / total) * 100) : 0;
+  const barColor =
+    pct >= 80 ? COLORS.success : pct >= 50 ? COLORS.primary : COLORS.danger;
+  const chipBg =
+    pct >= 80
+      ? COLORS.successLight
+      : pct >= 50
+        ? COLORS.accent.hiveLight
+        : COLORS.dangerLight;
 
   return (
     <View style={styles.healthCard}>
       <View style={styles.healthHeader}>
-        <Text style={styles.healthTitle}>Zdravlje košnica</Text>
-        <Text style={styles.healthPercent}>
-          {total > 0 ? `${Math.round(healthPercent)}%` : "–"}
-        </Text>
+        <AppText style={styles.healthTitle}>Zdravlje košnica</AppText>
+        <View style={[styles.chip, { backgroundColor: chipBg }]}>
+          <AppText
+            style={[styles.chipText, { color: barColor, fontWeight: "700" }]}
+            maxFontSizeMultiplier={1}
+            adjustsFontSizeToFit
+            numberOfLines={1}
+          >
+            {total > 0 ? `${pct}%` : "–"}
+          </AppText>
+        </View>
       </View>
-
-      <View style={styles.healthBar}>
+      <View style={styles.healthBarTrack}>
         <View
           style={[
             styles.healthBarFill,
-            {
-              width: `${healthPercent}%`,
-              backgroundColor:
-                healthPercent >= 80
-                  ? COLORS.success
-                  : healthPercent >= 50
-                  ? COLORS.primary
-                  : COLORS.danger,
-            },
+            { width: `${pct}%` as any, backgroundColor: barColor },
           ]}
         />
       </View>
-
-      <View style={styles.healthStats}>
-        <View style={styles.healthStat}>
-          <View style={[styles.healthDot, { backgroundColor: COLORS.success }]} />
-          <Text style={styles.healthStatText}>
-            Zdrave: {healthy}
-          </Text>
+      <View style={styles.healthRow}>
+        <View style={styles.healthItem}>
+          <View style={[styles.dot, { backgroundColor: COLORS.success }]} />
+          <AppText style={styles.healthItemText} maxFontSizeMultiplier={1.2}>
+            Zdrave: <AppText style={styles.healthItemBold}>{healthy}</AppText>
+          </AppText>
         </View>
-        <View style={styles.healthStat}>
-          <View style={[styles.healthDot, { backgroundColor: COLORS.danger }]} />
-          <Text style={styles.healthStatText}>
-            Pažnja: {needsAttention}
-          </Text>
+        <View style={styles.healthItem}>
+          <View style={[styles.dot, { backgroundColor: COLORS.danger }]} />
+          <AppText style={styles.healthItemText} maxFontSizeMultiplier={1.2}>
+            Pažnja: <AppText style={styles.healthItemBold}>{needsAttention}</AppText>
+          </AppText>
+        </View>
+        <View style={styles.healthItem}>
+          <View style={[styles.dot, { backgroundColor: COLORS.textMuted }]} />
+          <AppText style={styles.healthItemText} maxFontSizeMultiplier={1.2}>
+            Ukupno: <AppText style={styles.healthItemBold}>{total}</AppText>
+          </AppText>
         </View>
       </View>
     </View>
   );
 }
 
-interface FinancialSnapshotProps {
-  salesThisMonth: number;
-  onPress: () => void;
-}
-
-function FinancialSnapshot({ salesThisMonth, onPress }: FinancialSnapshotProps) {
-  return (
-    <TouchableOpacity
-      style={styles.financeCard}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <View style={styles.financeLeft}>
-        <View style={[styles.statIconContainer, { backgroundColor: COLORS.accent.saleLight }]}>
-          <Ionicons name="trending-up" size={20} color={COLORS.success} />
-        </View>
-        <View style={styles.financeText}>
-          <Text style={styles.financeLabel}>Prodaja ovog mjeseca</Text>
-          <Text style={styles.financeValue}>
-            {formatCurrencyShort(salesThisMonth)}
-          </Text>
-        </View>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
-    </TouchableOpacity>
-  );
-}
-
-// ─── Main Screen ────────────────────────────────────────────────
+// ─── Main Screen ─────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const { state, loading, error, metrics, refreshData } = useApp();
@@ -196,23 +181,43 @@ export default function HomeScreen() {
 
   if (error) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.centeredContainer}>
         <Ionicons name="alert-circle" size={48} color={COLORS.danger} />
-        <Text style={styles.errorText}>{error}</Text>
-        <Button title="Pokušaj ponovo" onPress={refreshData} style={{ marginTop: SPACING.md }} />
+        <AppText style={styles.errorText}>{error}</AppText>
+        <Button
+          title="Pokušaj ponovo"
+          onPress={refreshData}
+          style={{ marginTop: SPACING.md }}
+        />
       </View>
     );
   }
 
-  const queenBoxRows = state.queenBoxRows || [];
-  const allQueenBoxes = queenBoxRows.flatMap((row) => row.queenBoxes);
+  const allQueenBoxes = (state.queenBoxRows || []).flatMap((r) => r.queenBoxes);
   const matureQueenBoxes = allQueenBoxes.filter(
-    (box) => box.status === "mature"
+    (b) => b.status === "mature",
   ).length;
+  const totalHivesAndSwarms = metrics.totalHives + metrics.totalNuclei;
 
-  const totalHives = metrics.totalHives;
-  const healthyHives = metrics.healthyHives;
-  const needsAttention = metrics.hivesNeedingAttention;
+  const now = new Date();
+  const getUtcDateKey = (date: Date) =>
+    `${date.getUTCFullYear()}-${date.getUTCMonth()}-${date.getUTCDate()}`;
+  const hivesForInspectionToday = state.locations
+    .flatMap((loc) => loc.rows.flatMap((row) => row.hives))
+    .filter((h) => {
+      if (!h.scheduledInspection) return false;
+      const scheduledDate = new Date(h.scheduledInspection);
+      return getUtcDateKey(scheduledDate) === getUtcDateKey(now);
+    }).length;
+
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12 ? "Dobro jutro" : hour < 18 ? "Dobar dan" : "Dobro veče";
+  const today = new Date().toLocaleDateString("sr-Latn-RS", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
 
   return (
     <ScrollView
@@ -220,118 +225,149 @@ export default function HomeScreen() {
       contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
     >
-      {/* Greeting */}
-      <GreetingHeader />
+      {/* ── Greeting ─────────────────────────────── */}
+      <View style={styles.greetingSection}>
+        <AppText style={styles.greetingTitle}>{greeting} 🐝</AppText>
+        <AppText style={styles.greetingDate}>{today}</AppText>
+      </View>
 
-      {/* Weather */}
+      {/* ── Weather ──────────────────────────────── */}
       <WeatherWidget />
 
-      {/* Stat Cards */}
-      <SectionHeader title="Pregled" />
-      <View style={styles.statsRow}>
-        <StatCard
+      {/* ── 2×2 Hero Stats ───────────────────────── */}
+      <AppText style={styles.sectionTitle} maxFontSizeMultiplier={1}>Pregled</AppText>
+      <View style={styles.heroGrid}>
+        <HeroStat
           icon="grid"
           value={metrics.totalHives}
-          label="Košnica"
+          label="KOŠNICA"
           iconColor={COLORS.accent.hive}
           iconBg={COLORS.accent.hiveLight}
+          accentColor={COLORS.accent.hive}
           onPress={() => router.push("/hive")}
         />
-        <StatCard
+        <HeroStat
           icon="star"
           value={matureQueenBoxes}
-          label="Zrele matice"
+          label="ZRELE MATICE"
           iconColor={COLORS.accent.queen}
           iconBg={COLORS.accent.queenLight}
+          accentColor={COLORS.accent.queen}
           onPress={() => router.push("/queens")}
         />
-        <StatCard
+        <HeroStat
           icon="cube"
           value={metrics.totalNuclei}
-          label="Rojevi"
+          label="ROJEVI"
           iconColor={COLORS.accent.swarm}
           iconBg={COLORS.accent.swarmLight}
+          accentColor={COLORS.accent.swarm}
           onPress={() => router.push("/hive")}
         />
-        <StatCard
-          icon="pricetag"
-          value={metrics.nucleiForSale}
-          label="Spremni"
-          iconColor={COLORS.accent.sale}
-          iconBg={COLORS.accent.saleLight}
-          onPress={() => router.push("/hive")}
+        <HeroStat
+          icon="trending-up"
+          value={formatCurrencyShort(metrics.totalSalesThisMonth)}
+          label="PRIHOD"
+          chip="ovaj mj."
+          iconColor={COLORS.success}
+          iconBg={COLORS.successLight}
+          accentColor={COLORS.success}
+          onPress={() => router.push("/finansije")}
         />
       </View>
 
-      {/* Combined Hives + Swarms */}
+      {/* ── Combined total ───────────────────────── */}
       <TouchableOpacity
-        style={styles.combinedCard}
+        style={styles.totalCard}
         onPress={() => router.push("/hive")}
-        activeOpacity={0.7}
+        activeOpacity={0.75}
       >
-        <View style={styles.combinedLeft}>
-          <View style={[styles.statIconContainer, { backgroundColor: COLORS.accent.hiveLight }]}>
-            <Ionicons name="layers" size={20} color={COLORS.accent.hive} />
+        <View style={styles.totalLeft}>
+          <View
+            style={[
+              styles.iconBox,
+              { backgroundColor: COLORS.accent.hiveLight },
+            ]}
+          >
+            <Ionicons name="layers" size={18} color={COLORS.accent.hive} />
           </View>
           <View>
-            <Text style={styles.combinedLabel}>Ukupno košnica i rojeva</Text>
-            <Text style={styles.combinedBreakdown}>
-              {metrics.totalHives} košnica • {metrics.totalNuclei} rojeva
-            </Text>
+            <AppText style={styles.totalCardTitle} numberOfLines={1} adjustsFontSizeToFit>Ukupno košnica i rojeva</AppText>
+            <AppText style={styles.totalCardSub} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={1.2}>
+              {metrics.totalHives} košnica · {metrics.totalNuclei} rojeva
+            </AppText>
           </View>
         </View>
-        <View style={styles.combinedRight}>
-          <Text style={styles.combinedValue}>{metrics.totalHives + metrics.totalNuclei}</Text>
-          <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+        <View style={styles.totalRight}>
+          <AppText style={styles.totalCardValue} maxFontSizeMultiplier={1.2}>{totalHivesAndSwarms}</AppText>
+          <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
         </View>
       </TouchableOpacity>
 
-      {/* Health Overview */}
-      <SectionHeader title="Stanje" />
-      <HealthOverview
-        healthy={healthyHives}
-        needsAttention={needsAttention}
-        total={totalHives}
+      {/* ── Health ───────────────────────────────── */}
+      <AppText style={styles.sectionTitle} maxFontSizeMultiplier={1}>Stanje</AppText>
+      <HealthCard
+        healthy={metrics.healthyHives}
+        needsAttention={metrics.hivesNeedingAttention}
+        total={metrics.totalHives}
       />
+      <TouchableOpacity
+        style={styles.inspectionButton}
+        activeOpacity={0.75}
+        onPress={() => router.push("/pregled")}
+      >
+        <View
+          style={[styles.iconBox, { backgroundColor: COLORS.accent.hiveLight }]}
+        >
+          <Ionicons name="search" size={16} color={COLORS.accent.hive} />
+        </View>
+        <AppText style={styles.inspectionButtonLabel}>Košnice za pregled</AppText>
+        {hivesForInspectionToday > 0 ? (
+          <View
+            style={[
+              styles.inspectionComingSoon,
+              { backgroundColor: COLORS.danger },
+            ]}
+          >
+            <AppText
+              style={[
+                styles.inspectionComingSoonText,
+                { color: COLORS.surface },
+              ]}
+              maxFontSizeMultiplier={1}
+            >
+              {hivesForInspectionToday}
+            </AppText>
+          </View>
+        ) : null}
+        <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+      </TouchableOpacity>
 
-      {/* Financial Snapshot */}
-      <FinancialSnapshot
-        salesThisMonth={metrics.totalSalesThisMonth}
-        onPress={() => router.push("/finansije")}
-      />
-
-      {/* Quick Actions */}
-      <SectionHeader title="Brzi pristup" />
-      <View style={styles.quickActionsGrid}>
-        <QuickActionCard
+      {/* ── Quick Actions ────────────────────────── */}
+      <AppText style={styles.sectionTitle} maxFontSizeMultiplier={1}>Brzi pristup</AppText>
+      <View style={styles.quickGrid}>
+        <QuickActionTile
           icon="grid"
           label="Košnice"
           color={COLORS.accent.hive}
           bgColor={COLORS.accent.hiveLight}
           onPress={() => router.push("/hive")}
         />
-        <QuickActionCard
+        <QuickActionTile
           icon="star"
           label="Matice"
           color={COLORS.accent.queen}
           bgColor={COLORS.accent.queenLight}
           onPress={() => router.push("/queens")}
         />
-        <QuickActionCard
-          icon="cube"
-          label="Rojevi"
-          color={COLORS.accent.swarm}
-          bgColor={COLORS.accent.swarmLight}
-          onPress={() => router.push("/hive")}
-        />
-        <QuickActionCard
+        <QuickActionTile
           icon="wallet"
           label="Finansije"
-          color={COLORS.primary}
-          bgColor={COLORS.accent.hiveLight}
+          color={COLORS.accent.finance}
+          bgColor={COLORS.accent.financeLight}
           onPress={() => router.push("/finansije")}
         />
-        <QuickActionCard
+        <QuickActionTile
           icon="receipt"
           label="Porudžbine"
           color={COLORS.accent.queen}
@@ -340,13 +376,12 @@ export default function HomeScreen() {
         />
       </View>
 
-      {/* Bottom Spacer */}
-      <View style={styles.bottomSpacer} />
+      <View style={{ height: SPACING.xxxl }} />
     </ScrollView>
   );
 }
 
-// ─── Styles ─────────────────────────────────────────────────────
+// ─── Styles ──────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -355,129 +390,154 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING.lg,
+    paddingTop: SPACING.xl,
   },
-  loadingContainer: {
+  centeredContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.background,
-  },
-  loadingText: {
-    marginTop: SPACING.md,
-    fontSize: FONT_SIZE.md,
-    color: COLORS.textSecondary,
+    padding: SPACING.xxxl,
   },
   errorText: {
-    fontSize: FONT_SIZE.lg,
+    fontSize: FONT_SIZE.md,
     color: COLORS.danger,
     textAlign: "center",
     marginTop: SPACING.md,
   },
 
-  // ── Greeting ───────────────────────────────────────
-  greetingContainer: {
+  // ── Greeting ──────────────────────────────
+  greetingSection: {
     marginBottom: SPACING.xxl,
   },
-  greetingText: {
+  greetingEyebrow: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: COLORS.primary,
+    letterSpacing: 1.4,
+    marginBottom: SPACING.xs,
+  },
+  greetingTitle: {
     fontSize: FONT_SIZE.xxl,
     fontWeight: "700",
     color: COLORS.textPrimary,
     marginBottom: SPACING.xs,
   },
-  dateText: {
-    fontSize: FONT_SIZE.md,
+  greetingDate: {
+    fontSize: FONT_SIZE.sm,
     color: COLORS.textSecondary,
     textTransform: "capitalize",
   },
 
-  // ── Section Header ─────────────────────────────────
+  // ── Section Title ─────────────────────────
   sectionTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
+    fontSize: 11,
+    fontWeight: "700",
+    color: COLORS.textSecondary,
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
     marginBottom: SPACING.md,
+    marginTop: SPACING.xxl,
   },
 
-  // ── Stat Cards ─────────────────────────────────────
-  statsRow: {
-    flexDirection: "row",
-    gap: SPACING.md,
-    marginBottom: SPACING.xxl,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    alignItems: "center",
-    ...SHADOW.md,
-  },
-  statIconContainer: {
-    width: 40,
-    height: 40,
+  // ── Shared icon box ───────────────────────
+  iconBox: {
+    width: 36,
+    height: 36,
     borderRadius: RADIUS.md,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: SPACING.sm,
   },
-  statValue: {
+
+  // ── Chip ──────────────────────────────────
+  chip: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 3,
+    borderRadius: RADIUS.full,
+  },
+  chipText: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.2,
+  },
+
+  // ── Hero 2×2 Grid ─────────────────────────
+  heroGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.md,
+  },
+  heroStat: {
+    flexBasis: "47%",
+    flexGrow: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    borderTopWidth: 3,
+    padding: SPACING.lg,
+    ...SHADOW.md,
+  },
+  heroStatTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: SPACING.md,
+  },
+  heroStatValue: {
     fontSize: FONT_SIZE.xl,
     fontWeight: "700",
     color: COLORS.textPrimary,
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  statLabel: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: "500",
+  heroStatLabel: {
+    fontSize: 11,
+    fontWeight: "700",
     color: COLORS.textSecondary,
-    textAlign: "center",
+    letterSpacing: 0.8,
   },
 
-  // ── Combined Card ─────────────────────────────────
-  combinedCard: {
+  // ── Total Card ────────────────────────────
+  totalCard: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
-    marginBottom: SPACING.xxl,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginTop: SPACING.md,
     ...SHADOW.md,
   },
-  combinedLeft: {
+  totalLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.md,
     flex: 1,
   },
-  combinedRight: {
+  totalRight: {
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.sm,
   },
-  combinedLabel: {
+  totalCardTitle: {
     fontSize: FONT_SIZE.sm,
     fontWeight: "600",
     color: COLORS.textPrimary,
     marginBottom: 2,
   },
-  combinedBreakdown: {
+  totalCardSub: {
     fontSize: FONT_SIZE.xs,
     color: COLORS.textSecondary,
   },
-  combinedValue: {
-    fontSize: FONT_SIZE.xxl,
+  totalCardValue: {
+    fontSize: FONT_SIZE.xl,
     fontWeight: "700",
     color: COLORS.accent.hive,
   },
 
-  // ── Health Overview ────────────────────────────────
+  // ── Health Card ───────────────────────────
   healthCard: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
-    marginBottom: SPACING.md,
     ...SHADOW.md,
   },
   healthHeader: {
@@ -491,107 +551,101 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.textPrimary,
   },
-  healthPercent: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: "700",
-    color: COLORS.success,
-  },
-  healthBar: {
-    height: 8,
+  healthBarTrack: {
+    height: 6,
     backgroundColor: COLORS.border,
-    borderRadius: 4,
-    marginBottom: SPACING.md,
+    borderRadius: 3,
     overflow: "hidden",
+    marginBottom: SPACING.md,
   },
   healthBarFill: {
     height: "100%",
-    borderRadius: 4,
+    borderRadius: 3,
   },
-  healthStats: {
-    flexDirection: "row",
-    gap: SPACING.xl,
-  },
-  healthStat: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-  },
-  healthDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  healthStatText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSecondary,
-  },
-
-  // ── Financial Snapshot ─────────────────────────────
-  financeCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.xxl,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    ...SHADOW.md,
-  },
-  financeLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.md,
-  },
-  financeText: {
-    gap: SPACING.xs,
-  },
-  financeLabel: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSecondary,
-  },
-  financeValue: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: "700",
-    color: COLORS.textPrimary,
-  },
-
-  // ── Quick Actions ──────────────────────────────────
-  quickActionsGrid: {
+  healthRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: SPACING.md,
-    marginBottom: SPACING.lg,
+    rowGap: SPACING.xs,
   },
-  quickAction: {
-    flexGrow: 1,
-    flexBasis: "45%",
+  healthItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  healthItemText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+  },
+  healthItemBold: {
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+  },
+
+  // ── Inspection Button ─────────────────────
+  inspectionButton: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.md,
+    marginTop: SPACING.md,
     ...SHADOW.sm,
   },
-  quickActionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickActionLabel: {
+  inspectionButtonLabel: {
     flex: 1,
     fontSize: FONT_SIZE.md,
     fontWeight: "500",
     color: COLORS.textPrimary,
   },
-  quickActionChevron: {
-    marginLeft: "auto",
+  inspectionComingSoon: {
+    backgroundColor: COLORS.accent.hiveLight,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 3,
+    borderRadius: RADIUS.full,
+  },
+  inspectionComingSoonText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.accent.hive,
   },
 
-  // ── Spacer ─────────────────────────────────────────
-  bottomSpacer: {
-    height: SPACING.xxxl,
+  // ── Quick Actions ─────────────────────────
+  quickGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.md,
+  },
+  quickTile: {
+    flexBasis: "30%",
+    flexGrow: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    alignItems: "center",
+    gap: SPACING.sm,
+    ...SHADOW.sm,
+    minHeight: 84,
+    justifyContent: "center",
+  },
+  quickTileIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickTileLabel: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    textAlign: "center",
   },
 });

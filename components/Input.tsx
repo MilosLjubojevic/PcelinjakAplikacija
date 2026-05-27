@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, TextInput, Text, StyleSheet, TextInputProps, ViewStyle } from 'react-native';
+import { View, TextInput, StyleSheet, TextInputProps, ViewStyle } from 'react-native';
+import AppText from './AppText';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/designTokens';
 
 interface InputProps extends TextInputProps {
@@ -11,7 +12,7 @@ interface InputProps extends TextInputProps {
 export default function Input({ label, error, containerStyle, style, ...props }: InputProps) {
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && <AppText style={styles.label}>{label}</AppText>}
       <TextInput
         style={[
           styles.input,
@@ -24,7 +25,7 @@ export default function Input({ label, error, containerStyle, style, ...props }:
         accessibilityHint={error ? `Greška: ${error}` : undefined}
         {...props}
       />
-      {error && <Text style={styles.errorText} accessibilityRole="alert">{error}</Text>}
+      {error && <AppText style={styles.errorText} accessibilityRole="alert">{error}</AppText>}
     </View>
   );
 }

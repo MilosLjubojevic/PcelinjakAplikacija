@@ -1,13 +1,13 @@
-import React, { useState, useMemo, useCallback } from "react";
+﻿import React, { useState, useMemo, useCallback } from "react";
 import {
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
   Alert,
   ActivityIndicator,
 } from "react-native";
+import AppText from "../components/AppText";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import * as Crypto from "expo-crypto";
@@ -156,14 +156,14 @@ export default function PolenScreen() {
         </TouchableOpacity>
         <View style={styles.summaryItem}>
           <Ionicons name="flower-outline" size={22} color={COLORS.primary} />
-          <Text style={styles.summaryValue}>{yearStats.count}</Text>
-          <Text style={styles.summaryLabel}>berbi {currentYear}.</Text>
+          <AppText style={styles.summaryValue}>{yearStats.count}</AppText>
+          <AppText style={styles.summaryLabel}>berbi {currentYear}.</AppText>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Ionicons name="scale-outline" size={22} color={COLORS.primary} />
-          <Text style={styles.summaryValue}>{formatWeight(yearStats.totalGrams)}</Text>
-          <Text style={styles.summaryLabel}>ukupno {currentYear}.</Text>
+          <AppText style={styles.summaryValue}>{formatWeight(yearStats.totalGrams)}</AppText>
+          <AppText style={styles.summaryLabel}>ukupno {currentYear}.</AppText>
         </View>
       </View>
 
@@ -193,10 +193,10 @@ export default function PolenScreen() {
                     <Ionicons name="flower" size={20} color={COLORS.primary} />
                   </View>
                   <View>
-                    <Text style={styles.weightText}>{formatWeight(harvest.weightGrams)}</Text>
+                    <AppText style={styles.weightText}>{formatWeight(harvest.weightGrams)}</AppText>
                     <View style={styles.dateBadge}>
                       <Ionicons name="calendar-outline" size={13} color={COLORS.primaryDark} />
-                      <Text style={styles.dateText}>{formatDate(harvest.date)}</Text>
+                      <AppText style={styles.dateText}>{formatDate(harvest.date)}</AppText>
                     </View>
                   </View>
                 </View>
@@ -210,9 +210,9 @@ export default function PolenScreen() {
               </View>
 
               {harvest.notes ? (
-                <Text style={styles.notesText} numberOfLines={2}>
+                <AppText style={styles.notesText} numberOfLines={2}>
                   {harvest.notes}
-                </Text>
+                </AppText>
               ) : null}
             </TouchableOpacity>
           ))}

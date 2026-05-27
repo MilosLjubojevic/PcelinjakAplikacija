@@ -30,6 +30,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#FFB800",
+          "sounds": []
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
@@ -42,7 +50,8 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-font"
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

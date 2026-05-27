@@ -319,6 +319,29 @@ create policy "Users manage own incomes"
   on incomes for all to authenticated using (true) with check (true);
 
 -- ============================================
+-- 14b. sync incomes category constraint (v5)
+-- NOTE: The original CREATE TABLE above uses an inline check constraint
+-- which PostgreSQL auto-names (NOT 'incomes_category_check'), so a plain
+-- DROP CONSTRAINT IF EXISTS won't catch it. This block drops ALL check
+-- constraints on the table first, then re-adds the correct one.
+-- ============================================
+do $$
+declare
+  r record;
+begin
+  for r in
+    select conname from pg_constraint
+    where conrelid = 'incomes'::regclass and contype = 'c'
+  loop
+    execute format('alter table incomes drop constraint %I', r.conname);
+  end loop;
+end $$;
+
+alter table incomes
+add constraint incomes_category_check
+check (category in ('honey-sale', 'nucleus-sale', 'queen-sale', 'hive-sale', 'wax-sale', 'pollen-sale', 'pollination', 'other'));
+
+-- ============================================
 -- 15. notes (bilješke)
 -- ============================================
 create table notes (
@@ -568,3 +591,50 @@ begin
     $f$, tbl);
   end loop;
 end $$;
+
+-- ============================================================
+-- Migration v4 — scheduled_inspection column + swarm_status fix
+-- ============================================================
+
+-- Add scheduled_inspection to hives (used by pregled.tsx for daily inspection schedule)
+ALTER TABLE hives ADD COLUMN IF NOT EXISTS scheduled_inspection timestamptz;
+
+-- Expand swarm_status constraint to include 'natural' (matches SwarmStatus type in the app)
+ALTER TABLE hives DROP CONSTRAINT IF EXISTS hives_swarm_status_check;
+ALTER TABLE hives ADD CONSTRAINT hives_swarm_status_check
+  CHECK (swarm_status IS NULL OR swarm_status IN ('empty', 'developing', 'ready', 'natural'));
+
+-- ============================================================
+-- Migration v5 — Realtime publication for all app tables
+-- Required for cross-device sync (hive inspections, etc.)
+-- Run in Supabase SQL Editor
+-- ============================================================
+
+DO $$
+DECLARE
+  tbl text;
+  app_tables text[] := ARRAY[
+    'locations', 'hive_rows', 'hives', 'hive_notes',
+    'hive_feeding_dates', 'hive_harvest_dates',
+    'queens', 'queen_box_rows', 'queen_boxes',
+    'sales', 'sale_items', 'expenses', 'incomes',
+    'notes', 'polen_harvests',
+    'products', 'product_price_options', 'orders', 'order_items'
+  ];
+BEGIN
+  FOREACH tbl IN ARRAY app_tables LOOP
+    -- Skip tables that don't exist in this database
+    IF NOT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = tbl) THEN
+      CONTINUE;
+    END IF;
+    -- Enable REPLICA IDENTITY FULL so UPDATE/DELETE events carry the full row
+    EXECUTE format('ALTER TABLE public.%I REPLICA IDENTITY FULL', tbl);
+    -- Add to realtime publication only if not already there
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = tbl
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', tbl);
+    END IF;
+  END LOOP;
+END $$;

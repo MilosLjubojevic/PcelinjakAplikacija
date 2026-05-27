@@ -73,6 +73,7 @@ export interface Hive {
   hasQueen?: boolean;
   queenId?: string;
   lastInspection?: Date;
+  scheduledInspection?: Date;
   notes?: HiveNote[];
   frameCount?: number;
   isHarvested?: boolean;
@@ -207,6 +208,7 @@ export type IncomeCategory =
   | "queen-sale"     // Prodaja matica
   | "hive-sale"      // Prodaja košnica
   | "wax-sale"       // Prodaja voska
+  | "pollen-sale"    // Prodaja polena
   | "pollination"    // Usluge oprašivanja
   | "other";         // Ostalo
 

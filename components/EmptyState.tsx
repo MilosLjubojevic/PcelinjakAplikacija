@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import Button from './Button';
 import { COLORS, SPACING, FONT_SIZE } from '../constants/designTokens';
@@ -24,8 +25,8 @@ export default function EmptyState({
       <View style={styles.iconCircle}>
         <Ionicons name={icon} size={40} color={COLORS.textMuted} />
       </View>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.message}>{message}</Text>
+      <AppText style={styles.title}>{title}</AppText>
+      <AppText style={styles.message}>{message}</AppText>
       {actionLabel && onAction && (
         <Button
           title={actionLabel}

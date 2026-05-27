@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
   ActivityIndicator,
   Alert,
   Image,
 } from "react-native";
+import AppText from "../components/AppText";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useSupabase } from "../context/SupabaseContext";
@@ -282,7 +282,7 @@ export default function ProductsScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Učitavanje...</Text>
+        <AppText style={styles.loadingText}>Učitavanje...</AppText>
       </View>
     );
   }
@@ -291,13 +291,13 @@ export default function ProductsScreen() {
     return (
       <View style={styles.errorContainer}>
         <Ionicons name="settings-outline" size={64} color={COLORS.primary} />
-        <Text style={styles.configTitle}>Supabase nije konfigurisan</Text>
-        <Text style={styles.configText}>
+        <AppText style={styles.configTitle}>Supabase nije konfigurisan</AppText>
+        <AppText style={styles.configText}>
           Otvorite utils/supabase.ts i dodajte vaše Supabase kredencijale:{"\n\n"}
           - SUPABASE_URL{"\n"}
           - SUPABASE_ANON_KEY{"\n"}
           - STORAGE_BUCKET
-        </Text>
+        </AppText>
       </View>
     );
   }
@@ -306,7 +306,7 @@ export default function ProductsScreen() {
     return (
       <View style={styles.errorContainer}>
         <Ionicons name="alert-circle" size={64} color={COLORS.danger} />
-        <Text style={styles.errorText}>{productsError}</Text>
+        <AppText style={styles.errorText}>{productsError}</AppText>
         <Button title="Pokušaj ponovo" onPress={fetchProducts} />
       </View>
     );
@@ -318,14 +318,14 @@ export default function ProductsScreen() {
       <Card style={styles.summaryCard}>
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Proizvoda</Text>
-            <Text style={styles.summaryValue}>{products.length}</Text>
+            <AppText style={styles.summaryLabel}>Proizvoda</AppText>
+            <AppText style={styles.summaryValue}>{products.length}</AppText>
           </View>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Ukupno na stanju</Text>
-            <Text style={styles.summaryValue}>
+            <AppText style={styles.summaryLabel}>Ukupno na stanju</AppText>
+            <AppText style={styles.summaryValue}>
               {products.reduce((sum, p) => sum + getTotalStock(p.price_options), 0)}
-            </Text>
+            </AppText>
           </View>
         </View>
       </Card>
@@ -361,18 +361,18 @@ export default function ProductsScreen() {
                   </View>
 
                   <View style={styles.productInfo}>
-                    <Text style={styles.productName}>{product.product_name}</Text>
+                    <AppText style={styles.productName}>{product.product_name}</AppText>
                     {product.type && (
                       <View style={styles.typeBadge}>
-                        <Text style={styles.typeText}>{product.type}</Text>
+                        <AppText style={styles.typeText}>{product.type}</AppText>
                       </View>
                     )}
-                    <Text style={styles.priceRange}>
+                    <AppText style={styles.priceRange}>
                       {getPriceRange(product.price_options)}
-                    </Text>
-                    <Text style={styles.stockText}>
+                    </AppText>
+                    <AppText style={styles.stockText}>
                       Na stanju: {getTotalStock(product.price_options)}
-                    </Text>
+                    </AppText>
                   </View>
 
                   <View style={styles.productActions}>
@@ -392,15 +392,15 @@ export default function ProductsScreen() {
                 </View>
 
                 {product.desc && (
-                  <Text style={styles.productDesc} numberOfLines={2}>
+                  <AppText style={styles.productDesc} numberOfLines={2}>
                     {product.desc}
-                  </Text>
+                  </AppText>
                 )}
 
                 {/* Price Options */}
                 <View style={styles.priceOptionsSection}>
                   <View style={styles.priceOptionsHeader}>
-                    <Text style={styles.priceOptionsTitle}>Opcije cijena</Text>
+                    <AppText style={styles.priceOptionsTitle}>Opcije cijena</AppText>
                     <TouchableOpacity
                       onPress={() => openAddPriceModal(product.id)}
                       style={styles.addPriceButton}
@@ -410,19 +410,19 @@ export default function ProductsScreen() {
                   </View>
 
                   {product.price_options.length === 0 ? (
-                    <Text style={styles.noPricesText}>Nema opcija cijena</Text>
+                    <AppText style={styles.noPricesText}>Nema opcija cijena</AppText>
                   ) : (
                     <View style={styles.priceOptionsList}>
                       {product.price_options.map((option) => (
                         <View key={option.id} style={styles.priceOptionItem}>
                           <View style={styles.priceOptionInfo}>
-                            <Text style={styles.priceOptionSize}>{option.size}</Text>
-                            <Text style={styles.priceOptionPrice}>
+                            <AppText style={styles.priceOptionSize}>{option.size}</AppText>
+                            <AppText style={styles.priceOptionPrice}>
                               {parseFloat(option.price).toLocaleString("sr-RS")} KM
-                            </Text>
-                            <Text style={styles.priceOptionStock}>
+                            </AppText>
+                            <AppText style={styles.priceOptionStock}>
                               Stanje: {option.stock}
-                            </Text>
+                            </AppText>
                           </View>
                           <View style={styles.priceOptionActions}>
                             <TouchableOpacity
@@ -487,7 +487,7 @@ export default function ProductsScreen() {
         />
 
         <View style={styles.imageSection}>
-          <Text style={styles.imageLabel}>Slika proizvoda</Text>
+          <AppText style={styles.imageLabel}>Slika proizvoda</AppText>
           <TouchableOpacity
             style={styles.imagePicker}
             onPress={pickImage}
@@ -504,7 +504,7 @@ export default function ProductsScreen() {
             ) : (
               <View style={styles.imagePickerPlaceholder}>
                 <Ionicons name="camera" size={32} color={COLORS.textMuted} />
-                <Text style={styles.imagePickerText}>Izaberi sliku</Text>
+                <AppText style={styles.imagePickerText}>Izaberi sliku</AppText>
               </View>
             )}
           </TouchableOpacity>

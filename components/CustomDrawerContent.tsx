@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
+import AppText from "./AppText";
 import {
   DrawerContentScrollView,
   DrawerItemList,
@@ -20,9 +21,9 @@ export default function CustomDrawerContent(props: any) {
       </DrawerContentScrollView>
       <View style={styles.footer}>
         {user?.email && (
-          <Text style={styles.emailText} numberOfLines={1}>
+          <AppText style={styles.emailText} numberOfLines={1}>
             {user.email}
-          </Text>
+          </AppText>
         )}
         <DrawerItem
           label="Odjavi se"
@@ -32,9 +33,9 @@ export default function CustomDrawerContent(props: any) {
           onPress={signOut}
           labelStyle={styles.signOutLabel}
         />
-        <Text style={styles.versionText}>
+        <AppText style={styles.versionText}>
           v{Constants.expoConfig?.version ?? "1.0.0"}
-        </Text>
+        </AppText>
       </View>
     </View>
   );

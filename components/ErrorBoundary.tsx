@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/designTokens';
 
@@ -38,18 +39,18 @@ export default class ErrorBoundary extends Component<Props, State> {
           <View style={styles.iconCircle}>
             <Ionicons name="warning-outline" size={48} color={COLORS.danger} />
           </View>
-          <Text style={styles.title}>Nešto je pošlo po zlu</Text>
-          <Text style={styles.message}>
+          <AppText style={styles.title}>Nešto je pošlo po zlu</AppText>
+          <AppText style={styles.message}>
             {this.props.fallbackMessage || 'Došlo je do neočekivane greške. Pokušajte ponovo.'}
-          </Text>
+          </AppText>
           {this.state.error && (
-            <Text style={styles.errorDetail} numberOfLines={3}>
+            <AppText style={styles.errorDetail} numberOfLines={3}>
               {this.state.error.message}
-            </Text>
+            </AppText>
           )}
           <TouchableOpacity style={styles.button} onPress={this.handleReset}>
             <Ionicons name="refresh" size={20} color={COLORS.surface} />
-            <Text style={styles.buttonText}>Pokušaj ponovo</Text>
+            <AppText style={styles.buttonText}>Pokušaj ponovo</AppText>
           </TouchableOpacity>
         </View>
       );

@@ -2,7 +2,6 @@ import React, { ReactNode, useCallback } from 'react';
 import {
   Modal as RNModal,
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AppText from './AppText';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants/designTokens';
 
 interface ModalProps {
@@ -60,7 +60,7 @@ export default function Modal({
         <View style={styles.modalContainer}>
           <View style={styles.handle} />
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{title}</Text>
+            <AppText style={styles.modalTitle} numberOfLines={1} adjustsFontSizeToFit>{title}</AppText>
             {showCloseButton && (
               <TouchableOpacity onPress={handleClose} style={styles.closeButton} activeOpacity={0.7}>
                 <Ionicons name="close" size={24} color={COLORS.textSecondary} />

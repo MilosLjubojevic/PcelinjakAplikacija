@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants/designTokens';
 
@@ -33,16 +34,16 @@ export default function Picker({
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && <AppText style={styles.label}>{label}</AppText>}
 
       <TouchableOpacity
         style={[styles.pickerButton, error && styles.pickerButtonError, isOpen && styles.pickerButtonOpen]}
         onPress={() => setIsOpen(!isOpen)}
         activeOpacity={0.7}
       >
-        <Text style={[styles.pickerText, !selectedOption && styles.placeholderText]}>
+        <AppText style={[styles.pickerText, !selectedOption && styles.placeholderText]}>
           {selectedOption ? selectedOption.label : placeholder}
-        </Text>
+        </AppText>
         <Ionicons
           name={isOpen ? 'chevron-up' : 'chevron-down'}
           size={18}
@@ -66,14 +67,14 @@ export default function Picker({
               }}
               activeOpacity={0.6}
             >
-              <Text
+              <AppText
                 style={[
                   styles.optionText,
                   option.value === value && styles.selectedOptionText,
                 ]}
               >
                 {option.label}
-              </Text>
+              </AppText>
               {option.value === value && (
                 <Ionicons name="checkmark" size={18} color={COLORS.primary} />
               )}
@@ -82,7 +83,7 @@ export default function Picker({
         </View>
       )}
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && <AppText style={styles.errorText}>{error}</AppText>}
     </View>
   );
 }

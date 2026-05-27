@@ -1,16 +1,15 @@
-import { Ionicons } from "@expo/vector-icons";
+﻿import { Ionicons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
 import { useState, useMemo } from "react";
 import {
   Alert,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import AppText from "../components/AppText";
 import Button from "../components/Button";
-import Card from "../components/Card";
 import EmptyState from "../components/EmptyState";
 import Input from "../components/Input";
 import Modal from "../components/Modal";
@@ -22,8 +21,150 @@ import { Expense, ExpenseCategory, Income, IncomeCategory, FinanceSummary } from
 import { expenseCategoryOptions, incomeCategoryOptions, getExpenseCategoryLabel, getIncomeCategoryLabel, getCategoryColor } from "../utils/categoryLabels";
 import { formatDate } from "../utils/dateUtils";
 
+// ─── Category Icon Map ───────────────────────────────────────────
+const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
+  equipment: "build",
+  feed: "leaf",
+  medication: "medical",
+  maintenance: "hammer",
+  transportation: "car",
+  packaging: "cube",
+  "honey-sale": "water",
+  "nucleus-sale": "bug",
+  "queen-sale": "star",
+  "hive-sale": "grid",
+  "wax-sale": "flame",
+  "pollen-sale": "color-filter",
+  pollination: "flower",
+  other: "ellipsis-horizontal",
+};
+
+function getCategoryIcon(category: string): keyof typeof Ionicons.glyphMap {
+  return categoryIcons[category] || "ellipsis-horizontal";
+}
+
+// ─── Monthly Chart Component ─────────────────────────────────────
+interface MonthlyDataPoint {
+  label: string;
+  income: number;
+  expense: number;
+}
+
+function MonthlyChart({ data }: { data: MonthlyDataPoint[] }) {
+  const maxVal = Math.max(...data.flatMap((d) => [d.income, d.expense]), 1);
+
+  return (
+    <View style={chartStyles.container}>
+      <View style={chartStyles.barsRow}>
+        {data.map((month, i) => (
+          <View key={i} style={chartStyles.monthCol}>
+            <View style={chartStyles.barsGroup}>
+              <View style={chartStyles.barWrapper}>
+                <View
+                  style={[
+                    chartStyles.bar,
+                    chartStyles.incomeBar,
+                    { height: Math.max(4, (month.income / maxVal) * 80) },
+                  ]}
+                />
+              </View>
+              <View style={chartStyles.barWrapper}>
+                <View
+                  style={[
+                    chartStyles.bar,
+                    chartStyles.expenseBar,
+                    { height: Math.max(4, (month.expense / maxVal) * 80) },
+                  ]}
+                />
+              </View>
+            </View>
+            <AppText style={chartStyles.monthLabel}>{month.label}</AppText>
+          </View>
+        ))}
+      </View>
+      <View style={chartStyles.legend}>
+        <View style={chartStyles.legendItem}>
+          <View style={[chartStyles.legendDot, { backgroundColor: COLORS.info }]} />
+          <AppText style={chartStyles.legendText}>Prihodi</AppText>
+        </View>
+        <View style={chartStyles.legendItem}>
+          <View style={[chartStyles.legendDot, { backgroundColor: COLORS.danger }]} />
+          <AppText style={chartStyles.legendText}>Troškovi</AppText>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const chartStyles = StyleSheet.create({
+  container: {
+    paddingTop: SPACING.sm,
+  },
+  barsRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    height: 96,
+    paddingBottom: SPACING.sm,
+  },
+  monthCol: {
+    flex: 1,
+    alignItems: "center",
+  },
+  barsGroup: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 2,
+  },
+  barWrapper: {
+    justifyContent: "flex-end",
+    height: 80,
+  },
+  bar: {
+    width: 10,
+    borderRadius: 3,
+  },
+  incomeBar: {
+    backgroundColor: COLORS.info,
+    opacity: 0.85,
+  },
+  expenseBar: {
+    backgroundColor: COLORS.danger,
+    opacity: 0.7,
+  },
+  monthLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+    marginTop: 4,
+    textTransform: "capitalize",
+  },
+  legend: {
+    flexDirection: "row",
+    gap: SPACING.lg,
+    marginTop: SPACING.sm,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    fontWeight: "500",
+  },
+});
+
+// ─── Main Screen ─────────────────────────────────────────────────
 export default function FinansijeScreen() {
   const { state, loading, error, addExpense, updateExpense, deleteExpense, addIncome, updateIncome, deleteIncome, refreshData } = useApp();
+  const [activeTab, setActiveTab] = useState<"income" | "expense">("income");
   const [modalType, setModalType] = useState<"expense" | "income">("expense");
   const [modalVisible, setModalVisible] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -49,29 +190,19 @@ export default function FinansijeScreen() {
 
   const openAddExpenseModal = () => {
     setModalType("expense");
+    setActiveTab("expense");
     setEditingExpense(null);
     setEditingIncome(null);
-    setFormData({
-      category: "equipment",
-      description: "",
-      amount: "",
-      date: new Date().toISOString().split("T")[0],
-      notes: "",
-    });
+    setFormData({ category: "equipment", description: "", amount: "", date: new Date().toISOString().split("T")[0], notes: "" });
     setModalVisible(true);
   };
 
   const openAddIncomeModal = () => {
     setModalType("income");
+    setActiveTab("income");
     setEditingExpense(null);
     setEditingIncome(null);
-    setFormData({
-      category: "honey-sale",
-      description: "",
-      amount: "",
-      date: new Date().toISOString().split("T")[0],
-      notes: "",
-    });
+    setFormData({ category: "honey-sale", description: "", amount: "", date: new Date().toISOString().split("T")[0], notes: "" });
     setModalVisible(true);
   };
 
@@ -106,7 +237,6 @@ export default function FinansijeScreen() {
   const handleSave = async () => {
     if (!formData.description || !formData.amount) return;
     setSaving(true);
-
     const now = new Date();
 
     if (modalType === "expense") {
@@ -117,17 +247,10 @@ export default function FinansijeScreen() {
         date: new Date(formData.date),
         notes: formData.notes || undefined,
       };
-
       if (editingExpense) {
         await updateExpense(editingExpense.id, expenseData);
       } else {
-        const newExpense: Expense = {
-          id: Crypto.randomUUID(),
-          ...expenseData,
-          createdAt: now,
-          updatedAt: now,
-        };
-        await addExpense(newExpense);
+        await addExpense({ id: Crypto.randomUUID(), ...expenseData, createdAt: now, updatedAt: now });
       }
     } else {
       const incomeData = {
@@ -137,17 +260,10 @@ export default function FinansijeScreen() {
         date: new Date(formData.date),
         notes: formData.notes || undefined,
       };
-
       if (editingIncome) {
         await updateIncome(editingIncome.id, incomeData);
       } else {
-        const newIncome: Income = {
-          id: Crypto.randomUUID(),
-          ...incomeData,
-          createdAt: now,
-          updatedAt: now,
-        };
-        await addIncome(newIncome);
+        await addIncome({ id: Crypto.randomUUID(), ...incomeData, createdAt: now, updatedAt: now });
       }
     }
 
@@ -157,399 +273,320 @@ export default function FinansijeScreen() {
   };
 
   const handleDeleteExpense = (id: string) => {
-    Alert.alert(
-      "Obriši trošak",
-      "Da li ste sigurni da želite obrisati ovaj trošak?",
-      [
-        { text: "Otkaži", style: "cancel" },
-        { text: "Obriši", style: "destructive", onPress: () => deleteExpense(id) },
-      ]
-    );
+    Alert.alert("Obriši trošak", "Da li ste sigurni da želite obrisati ovaj trošak?", [
+      { text: "Otkaži", style: "cancel" },
+      { text: "Obriši", style: "destructive", onPress: () => deleteExpense(id) },
+    ]);
   };
 
   const handleDeleteIncome = (id: string) => {
-    Alert.alert(
-      "Obriši prihod",
-      "Da li ste sigurni da želite obrisati ovaj prihod?",
-      [
-        { text: "Otkaži", style: "cancel" },
-        { text: "Obriši", style: "destructive", onPress: () => deleteIncome(id) },
-      ]
-    );
+    Alert.alert("Obriši prihod", "Da li ste sigurni da želite obrisati ovaj prihod?", [
+      { text: "Otkaži", style: "cancel" },
+      { text: "Obriši", style: "destructive", onPress: () => deleteIncome(id) },
+    ]);
   };
 
-  // Memoized finance summary
   const summary = useMemo((): FinanceSummary => {
     const expenses = state.expenses || [];
     const incomes = state.incomes || [];
-
-    const totalIncome = incomes.reduce(
-      (sum, income) => sum + income.amount,
-      0
-    );
-
-    const totalExpenses = expenses.reduce(
-      (sum, expense) => sum + expense.amount,
-      0
-    );
-
-    const expensesByCategory = expenses.reduce(
-      (acc, expense) => {
-        acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
-        return acc;
-      },
-      {} as Record<ExpenseCategory, number>
-    );
-
-    const incomeByCategory = incomes.reduce(
-      (acc, income) => {
-        acc[income.category] = (acc[income.category] || 0) + income.amount;
-        return acc;
-      },
-      {} as Record<IncomeCategory, number>
-    );
-
-    return {
-      totalIncome,
-      totalExpenses,
-      netProfit: totalIncome - totalExpenses,
-      expensesByCategory,
-      incomeByCategory,
-    };
+    const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const expensesByCategory = expenses.reduce((acc, e) => {
+      acc[e.category] = (acc[e.category] || 0) + e.amount;
+      return acc;
+    }, {} as Record<ExpenseCategory, number>);
+    const incomeByCategory = incomes.reduce((acc, i) => {
+      acc[i.category] = (acc[i.category] || 0) + i.amount;
+      return acc;
+    }, {} as Record<IncomeCategory, number>);
+    return { totalIncome, totalExpenses, netProfit: totalIncome - totalExpenses, expensesByCategory, incomeByCategory };
   }, [state.expenses, state.incomes]);
 
+  const monthlyData = useMemo((): MonthlyDataPoint[] => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, i) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const income = (state.incomes || [])
+        .filter((inc) => { const d = new Date(inc.date); return d.getFullYear() === year && d.getMonth() === month; })
+        .reduce((sum, inc) => sum + inc.amount, 0);
+      const expense = (state.expenses || [])
+        .filter((exp) => { const d = new Date(exp.date); return d.getFullYear() === year && d.getMonth() === month; })
+        .reduce((sum, exp) => sum + exp.amount, 0);
+      return {
+        label: date.toLocaleDateString("sr-Latn-RS", { month: "short" }),
+        income,
+        expense,
+      };
+    });
+  }, [state.incomes, state.expenses]);
+
+  const sortedIncomes = useMemo(
+    () => [...(state.incomes || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [state.incomes]
+  );
+  const sortedExpenses = useMemo(
+    () => [...(state.expenses || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [state.expenses]
+  );
+
+  const isProfit = summary.netProfit >= 0;
+  const profitColor = isProfit ? COLORS.success : COLORS.danger;
+  const profitBg = isProfit ? COLORS.successLight : COLORS.dangerLight;
+
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <ListSkeleton count={4} />
-      </View>
-    );
+    return <View style={styles.container}><ListSkeleton count={4} /></View>;
   }
 
   if (error) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.centered}>
         <Ionicons name="alert-circle" size={48} color={COLORS.danger} />
-        <Text style={styles.loadingText}>{error}</Text>
+        <AppText style={styles.errorText}>{error}</AppText>
         <Button title="Pokušaj ponovo" onPress={refreshData} style={{ marginTop: SPACING.md }} />
       </View>
     );
   }
 
+  const activeCategoryData = activeTab === "income" ? summary.incomeByCategory : summary.expensesByCategory;
+  const totalForTab = activeTab === "income" ? summary.totalIncome : summary.totalExpenses;
+  const getCategoryLabel = activeTab === "income" ? getIncomeCategoryLabel : getExpenseCategoryLabel;
+
   return (
     <View style={styles.container}>
-      {/* Summary Cards */}
-      <View style={styles.summaryContainer}>
-        <Card style={styles.summaryCard}>
-          <View style={styles.summaryIconContainer}>
-            <Ionicons name="trending-up" size={24} color={COLORS.success} />
-          </View>
-          <Text style={styles.summaryLabel}>Prihodi</Text>
-          <Text style={[styles.summaryAmount, { color: COLORS.success }]}>
-            {summary.totalIncome.toLocaleString("sr-RS")} KM
-          </Text>
-        </Card>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
-        <Card style={styles.summaryCard}>
-          <View style={styles.summaryIconContainer}>
-            <Ionicons name="trending-down" size={24} color={COLORS.danger} />
+        {/* ── Profit Hero ──────────────────────── */}
+        <View style={[styles.profitHero, { borderTopColor: profitColor }]}>
+          <View style={styles.profitHeroTop}>
+            <AppText style={styles.eyebrow}>UKUPNI PROFIT</AppText>
+            <View style={[styles.profitChip, { backgroundColor: profitBg }]}>
+              <Ionicons name={isProfit ? "trending-up" : "trending-down"} size={12} color={profitColor} />
+              <AppText style={[styles.profitChipText, { color: profitColor }]}>
+                {isProfit ? "Profit" : "Gubitak"}
+              </AppText>
+            </View>
           </View>
-          <Text style={styles.summaryLabel}>Troškovi</Text>
-          <Text style={[styles.summaryAmount, { color: COLORS.danger }]}>
-            {summary.totalExpenses.toLocaleString("sr-RS")} KM
-          </Text>
-        </Card>
+          <AppText style={[styles.profitAmount, { color: COLORS.textPrimary }]}>
+            {Math.abs(summary.netProfit).toLocaleString("sr-RS")}
+            <AppText style={styles.profitCurrency}> KM</AppText>
+          </AppText>
+        </View>
 
-        <Card
-          style={[
-            styles.summaryCard,
-            styles.profitCard,
-            summary.netProfit < 0 ? styles.lossCard : undefined,
-          ]}
-        >
-          <View style={styles.summaryIconContainer}>
+        {/* ── Income / Expense Split ───────────── */}
+        <View style={styles.splitRow}>
+          <View style={[styles.splitCard, { borderTopColor: COLORS.success }]}>
+            <View style={[styles.iconBox, { backgroundColor: COLORS.successLight }]}>
+              <Ionicons name="trending-up" size={16} color={COLORS.success} />
+            </View>
+            <AppText style={styles.splitEyebrow}>PRIHODI</AppText>
+            <AppText style={[styles.splitAmount, { color: COLORS.success }]}>
+              {summary.totalIncome.toLocaleString("sr-RS")}
+              <AppText style={styles.splitCurrency}> KM</AppText>
+            </AppText>
+            <AppText style={styles.splitCount} maxFontSizeMultiplier={1.2} numberOfLines={1}>{(state.incomes || []).length} stavki</AppText>
+          </View>
+
+          <View style={[styles.splitCard, { borderTopColor: COLORS.danger }]}>
+            <View style={[styles.iconBox, { backgroundColor: COLORS.dangerLight }]}>
+              <Ionicons name="trending-down" size={16} color={COLORS.danger} />
+            </View>
+            <AppText style={styles.splitEyebrow}>TROŠKOVI</AppText>
+            <AppText style={[styles.splitAmount, { color: COLORS.danger }]}>
+              {summary.totalExpenses.toLocaleString("sr-RS")}
+              <AppText style={styles.splitCurrency}> KM</AppText>
+            </AppText>
+            <AppText style={styles.splitCount} maxFontSizeMultiplier={1.2} numberOfLines={1}>{(state.expenses || []).length} stavki</AppText>
+          </View>
+        </View>
+
+        {/* ── Monthly Chart ────────────────────── */}
+        <AppText style={styles.sectionLabel} maxFontSizeMultiplier={1} numberOfLines={1}>ANALIZA</AppText>
+        <View style={styles.card}>
+          <AppText style={styles.cardTitle}>Mesečna analiza</AppText>
+          <MonthlyChart data={monthlyData} />
+        </View>
+
+        {/* ── Transactions ─────────────────────── */}
+        <AppText style={styles.sectionLabel} maxFontSizeMultiplier={1} numberOfLines={1}>TRANSAKCIJE</AppText>
+
+        {/* Tab Toggle */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === "income" && styles.tabBtnActive]}
+            onPress={() => setActiveTab("income")}
+            activeOpacity={0.75}
+          >
             <Ionicons
-              name={summary.netProfit >= 0 ? "cash" : "alert-circle"}
-              size={24}
-              color={COLORS.surface}
+              name="arrow-up-circle"
+              size={14}
+              color={activeTab === "income" ? COLORS.surface : COLORS.textSecondary}
             />
-          </View>
-          <Text style={styles.profitLabel}>
-            {summary.netProfit >= 0 ? "Profit" : "Gubitak"}
-          </Text>
-          <Text style={styles.profitAmount}>
-            {Math.abs(summary.netProfit).toLocaleString("sr-RS")} KM
-          </Text>
-        </Card>
-      </View>
-
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Income by Category */}
-        {Object.keys(summary.incomeByCategory).length > 0 && (
-          <View style={styles.categorySection}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="pie-chart" size={20} color={COLORS.primaryDark} />
-              <Text style={styles.sectionTitle}>Prihodi po kategorijama</Text>
+            <AppText style={[styles.tabText, activeTab === "income" && styles.tabTextActive]}>
+              Prihodi
+            </AppText>
+            <View style={[styles.tabBadge, activeTab === "income" && styles.tabBadgeActive]}>
+              <AppText style={[styles.tabBadgeText, activeTab === "income" && styles.tabBadgeTextActive]}>
+                {(state.incomes || []).length}
+              </AppText>
             </View>
-            <Card style={styles.categoryCard}>
-              {(Object.entries(summary.incomeByCategory) as [IncomeCategory, number][])
-                .sort((a, b) => b[1] - a[1])
-                .map(([category, amount], index, arr) => (
-                  <View
-                    key={category}
-                    style={[
-                      styles.categoryRow,
-                      index === arr.length - 1 && styles.categoryRowLast
-                    ]}
-                  >
-                    <View style={styles.categoryLeft}>
-                      <View
-                        style={[
-                          styles.categoryDot,
-                          { backgroundColor: getCategoryColor(category) },
-                        ]}
-                      />
-                      <Text style={styles.categoryName}>
-                        {getIncomeCategoryLabel(category)}
-                      </Text>
-                    </View>
-                    <Text style={[styles.categoryAmount, { color: COLORS.success }]}>
-                      {amount.toLocaleString("sr-RS")} KM
-                    </Text>
-                  </View>
-                ))}
-            </Card>
-          </View>
-        )}
+          </TouchableOpacity>
 
-        {/* Income List */}
-        <View style={styles.listHeader}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="arrow-up-circle" size={20} color={COLORS.success} />
-            <Text style={styles.sectionTitle}>Prihodi</Text>
-          </View>
-          <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>
-              {(state.incomes || []).length}
-            </Text>
-          </View>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === "expense" && styles.tabBtnActiveExpense]}
+            onPress={() => setActiveTab("expense")}
+            activeOpacity={0.75}
+          >
+            <Ionicons
+              name="arrow-down-circle"
+              size={14}
+              color={activeTab === "expense" ? COLORS.surface : COLORS.textSecondary}
+            />
+            <AppText style={[styles.tabText, activeTab === "expense" && styles.tabTextActive]}>
+              Troškovi
+            </AppText>
+            <View style={[styles.tabBadge, activeTab === "expense" && styles.tabBadgeActiveExpense]}>
+              <AppText style={[styles.tabBadgeText, activeTab === "expense" && styles.tabBadgeTextActive]}>
+                {(state.expenses || []).length}
+              </AppText>
+            </View>
+          </TouchableOpacity>
         </View>
 
-        {(state.incomes || []).length === 0 ? (
-          <View style={styles.emptySection}>
-            <EmptyState
-              icon="trending-up-outline"
-              title="Nema prihoda"
-              message="Dodajte prihode da biste pratili finansije."
-            />
-          </View>
-        ) : (
-          (state.incomes || [])
-            .sort(
-              (a, b) =>
-                new Date(b.date).getTime() - new Date(a.date).getTime()
-            )
-            .map((income) => (
-              <Card key={income.id} style={[styles.itemCard, { borderLeftColor: COLORS.success }]}>
-                <View style={styles.itemHeader}>
-                  <View style={styles.itemLeft}>
-                    <View
-                      style={[
-                        styles.categoryBadge,
-                        { backgroundColor: getCategoryColor(income.category) },
-                      ]}
-                    >
-                      <Text style={styles.categoryBadgeText}>
-                        {getIncomeCategoryLabel(income.category)}
-                      </Text>
+        {/* Category Breakdown */}
+        {Object.keys(activeCategoryData).length > 0 && (
+          <View style={styles.categoryCard}>
+            {(Object.entries(activeCategoryData) as [string, number][])
+              .sort((a, b) => b[1] - a[1])
+              .map(([category, amount], index, arr) => {
+                const pct = totalForTab > 0 ? (amount / totalForTab) * 100 : 0;
+                const color = getCategoryColor(category as any);
+                return (
+                  <View key={category} style={[styles.categoryRow, index === arr.length - 1 && { borderBottomWidth: 0 }]}>
+                    <View style={[styles.catIconBox, { backgroundColor: color + "22" }]}>
+                      <Ionicons name={getCategoryIcon(category)} size={13} color={color} />
                     </View>
-                    <Text style={styles.itemDescription}>
-                      {income.description}
-                    </Text>
-                  </View>
-                  <Text style={styles.incomeAmount}>
-                    +{income.amount.toLocaleString("sr-RS")} KM
-                  </Text>
-                </View>
-
-                <View style={styles.itemFooter}>
-                  <Text style={styles.itemDate}>
-                    {formatDate(income.date)}
-                  </Text>
-                  <View style={styles.itemActions}>
-                    <TouchableOpacity
-                      onPress={() => openEditIncomeModal(income)}
-                      style={styles.actionButton}
-                    >
-                      <Ionicons name="create-outline" size={20} color={COLORS.primaryDark} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteIncome(income.id)}
-                      style={styles.actionButton}
-                    >
-                      <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {income.notes && (
-                  <Text style={styles.itemNotes}>{income.notes}</Text>
-                )}
-              </Card>
-            ))
-        )}
-
-        {/* Divider */}
-        {(state.incomes || []).length > 0 && (state.expenses || []).length > 0 && (
-          <View style={styles.divider} />
-        )}
-
-        {/* Expenses by Category */}
-        {Object.keys(summary.expensesByCategory).length > 0 && (
-          <View style={styles.categorySection}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="pie-chart" size={20} color={COLORS.primaryDark} />
-              <Text style={styles.sectionTitle}>Troškovi po kategorijama</Text>
-            </View>
-            <Card style={styles.categoryCard}>
-              {(Object.entries(summary.expensesByCategory) as [ExpenseCategory, number][])
-                .sort((a, b) => b[1] - a[1])
-                .map(([category, amount], index, arr) => (
-                  <View
-                    key={category}
-                    style={[
-                      styles.categoryRow,
-                      index === arr.length - 1 && styles.categoryRowLast
-                    ]}
-                  >
-                    <View style={styles.categoryLeft}>
-                      <View
-                        style={[
-                          styles.categoryDot,
-                          { backgroundColor: getCategoryColor(category) },
-                        ]}
-                      />
-                      <Text style={styles.categoryName}>
-                        {getExpenseCategoryLabel(category)}
-                      </Text>
+                    <View style={styles.categoryMiddle}>
+                      <AppText style={styles.categoryName}>{getCategoryLabel(category as any)}</AppText>
+                      <View style={styles.categoryBarTrack}>
+                        <View style={[styles.categoryBarFill, { width: `${pct}%` as any, backgroundColor: color }]} />
+                      </View>
                     </View>
-                    <Text style={styles.categoryAmount}>
+                    <AppText style={[styles.categoryAmount, { color }]}>
                       {amount.toLocaleString("sr-RS")} KM
-                    </Text>
+                    </AppText>
                   </View>
-                ))}
-            </Card>
+                );
+              })}
           </View>
         )}
 
-        {/* Expenses List */}
-        <View style={styles.listHeader}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="arrow-down-circle" size={20} color={COLORS.danger} />
-            <Text style={styles.sectionTitle}>Troškovi</Text>
-          </View>
-          <View style={styles.countBadge}>
-            <Text style={styles.countBadgeText}>
-              {(state.expenses || []).length}
-            </Text>
-          </View>
-        </View>
-
-        {(state.expenses || []).length === 0 ? (
-          <View style={styles.emptySection}>
-            <EmptyState
-              icon="wallet-outline"
-              title="Nema troškova"
-              message="Dodajte troškove da biste pratili finansije."
-            />
-          </View>
-        ) : (
-          (state.expenses || [])
-            .sort(
-              (a, b) =>
-                new Date(b.date).getTime() - new Date(a.date).getTime()
-            )
-            .map((expense) => (
-              <Card key={expense.id} style={[styles.itemCard, { borderLeftColor: COLORS.danger }]}>
-                <View style={styles.itemHeader}>
-                  <View style={styles.itemLeft}>
-                    <View
-                      style={[
-                        styles.categoryBadge,
-                        { backgroundColor: getCategoryColor(expense.category) },
-                      ]}
-                    >
-                      <Text style={styles.categoryBadgeText}>
-                        {getExpenseCategoryLabel(expense.category)}
-                      </Text>
+        {/* Transaction List */}
+        {activeTab === "income" ? (
+          sortedIncomes.length === 0 ? (
+            <EmptyState icon="trending-up-outline" title="Nema prihoda" message="Dodajte prihode da biste pratili finansije." />
+          ) : (
+            sortedIncomes.map((income) => {
+              const color = getCategoryColor(income.category);
+              return (
+                <View key={income.id} style={styles.txCard}>
+                  <View style={[styles.txIconBox, { backgroundColor: color + "22" }]}>
+                    <Ionicons name={getCategoryIcon(income.category)} size={20} color={color} />
+                  </View>
+                  <View style={styles.txMiddle}>
+                    <AppText style={styles.txDescription} numberOfLines={1}>{income.description}</AppText>
+                    <View style={styles.txMeta}>
+                      <View style={[styles.txCategoryChip, { backgroundColor: color + "22" }]}>
+                        <AppText style={[styles.txCategoryText, { color }]}>
+                          {getIncomeCategoryLabel(income.category)}
+                        </AppText>
+                      </View>
+                      <AppText style={styles.txDate}>{formatDate(income.date)}</AppText>
                     </View>
-                    <Text style={styles.itemDescription}>
-                      {expense.description}
-                    </Text>
+                    {income.notes ? <AppText style={styles.txNotes} numberOfLines={1}>{income.notes}</AppText> : null}
                   </View>
-                  <Text style={styles.expenseAmount}>
-                    -{expense.amount.toLocaleString("sr-RS")} KM
-                  </Text>
-                </View>
-
-                <View style={styles.itemFooter}>
-                  <Text style={styles.itemDate}>
-                    {formatDate(expense.date)}
-                  </Text>
-                  <View style={styles.itemActions}>
-                    <TouchableOpacity
-                      onPress={() => openEditExpenseModal(expense)}
-                      style={styles.actionButton}
-                    >
-                      <Ionicons name="create-outline" size={20} color={COLORS.primaryDark} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteExpense(expense.id)}
-                      style={styles.actionButton}
-                    >
-                      <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
-                    </TouchableOpacity>
+                  <View style={styles.txRight}>
+                    <AppText style={styles.txAmountIncome}>+{income.amount.toLocaleString("sr-RS")}</AppText>
+                    <AppText style={styles.txCurrency}>KM</AppText>
+                    <View style={styles.txActions}>
+                      <TouchableOpacity onPress={() => openEditIncomeModal(income)} style={styles.txActionBtn}>
+                        <Ionicons name="create-outline" size={16} color={COLORS.primaryDark} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteIncome(income.id)} style={styles.txActionBtn}>
+                        <Ionicons name="trash-outline" size={16} color={COLORS.danger} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
-
-                {expense.notes && (
-                  <Text style={styles.itemNotes}>{expense.notes}</Text>
-                )}
-              </Card>
-            ))
+              );
+            })
+          )
+        ) : (
+          sortedExpenses.length === 0 ? (
+            <EmptyState icon="wallet-outline" title="Nema troškova" message="Dodajte troškove da biste pratili finansije." />
+          ) : (
+            sortedExpenses.map((expense) => {
+              const color = getCategoryColor(expense.category);
+              return (
+                <View key={expense.id} style={styles.txCard}>
+                  <View style={[styles.txIconBox, { backgroundColor: color + "22" }]}>
+                    <Ionicons name={getCategoryIcon(expense.category)} size={20} color={color} />
+                  </View>
+                  <View style={styles.txMiddle}>
+                    <AppText style={styles.txDescription} numberOfLines={1}>{expense.description}</AppText>
+                    <View style={styles.txMeta}>
+                      <View style={[styles.txCategoryChip, { backgroundColor: color + "22" }]}>
+                        <AppText style={[styles.txCategoryText, { color }]}>
+                          {getExpenseCategoryLabel(expense.category)}
+                        </AppText>
+                      </View>
+                      <AppText style={styles.txDate}>{formatDate(expense.date)}</AppText>
+                    </View>
+                    {expense.notes ? <AppText style={styles.txNotes} numberOfLines={1}>{expense.notes}</AppText> : null}
+                  </View>
+                  <View style={styles.txRight}>
+                    <AppText style={styles.txAmountExpense}>-{expense.amount.toLocaleString("sr-RS")}</AppText>
+                    <AppText style={styles.txCurrency}>KM</AppText>
+                    <View style={styles.txActions}>
+                      <TouchableOpacity onPress={() => openEditExpenseModal(expense)} style={styles.txActionBtn}>
+                        <Ionicons name="create-outline" size={16} color={COLORS.primaryDark} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteExpense(expense.id)} style={styles.txActionBtn}>
+                        <Ionicons name="trash-outline" size={16} color={COLORS.danger} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              );
+            })
+          )
         )}
-        <View style={{ height: 80 }} />
+
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Floating Action Buttons */}
-      <View style={styles.fabContainer}>
-        <TouchableOpacity style={styles.addExpenseButton} onPress={openAddExpenseModal}>
-          <Ionicons name="remove" size={20} color={COLORS.surface} />
-          <Text style={styles.addButtonText}>Trošak</Text>
+      {/* ── Bottom Action Row ─────────────────── */}
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.addExpenseBtn} onPress={openAddExpenseModal} activeOpacity={0.85}>
+          <Ionicons name="remove-circle-outline" size={18} color={COLORS.surface} />
+          <AppText style={styles.addBtnText}>Dodaj trošak</AppText>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.addIncomeButton} onPress={openAddIncomeModal}>
-          <Ionicons name="add" size={20} color={COLORS.surface} />
-          <Text style={styles.addButtonText}>Prihod</Text>
+        <TouchableOpacity style={styles.addIncomeBtn} onPress={openAddIncomeModal} activeOpacity={0.85}>
+          <Ionicons name="add-circle-outline" size={18} color={COLORS.surface} />
+          <AppText style={styles.addBtnText}>Dodaj prihod</AppText>
         </TouchableOpacity>
       </View>
 
-      {/* Add/Edit Modal */}
+      {/* ── Modal ────────────────────────────── */}
       <Modal
         visible={modalVisible}
-        onClose={() => {
-          setModalVisible(false);
-          resetForm();
-        }}
-        hasUnsavedChanges={formData.description !== '' || formData.amount !== ''}
+        onClose={() => { setModalVisible(false); resetForm(); }}
+        hasUnsavedChanges={formData.description !== "" || formData.amount !== ""}
         title={
           modalType === "expense"
-            ? editingExpense
-              ? "Izmeni Trošak"
-              : "Dodaj Trošak"
-            : editingIncome
-            ? "Izmeni Prihod"
-            : "Dodaj Prihod"
+            ? editingExpense ? "Izmeni Trošak" : "Dodaj Trošak"
+            : editingIncome ? "Izmeni Prihod" : "Dodaj Prihod"
         }
       >
         <View style={styles.formSection}>
@@ -557,12 +594,7 @@ export default function FinansijeScreen() {
             label="Kategorija"
             value={formData.category}
             options={modalType === "expense" ? expenseCategoryOptions : incomeCategoryOptions}
-            onValueChange={(value) =>
-              setFormData({
-                ...formData,
-                category: value as ExpenseCategory | IncomeCategory,
-              })
-            }
+            onValueChange={(value) => setFormData({ ...formData, category: value as ExpenseCategory | IncomeCategory })}
           />
         </View>
 
@@ -570,9 +602,7 @@ export default function FinansijeScreen() {
           <Input
             label="Opis"
             value={formData.description}
-            onChangeText={(text) =>
-              setFormData({ ...formData, description: text })
-            }
+            onChangeText={(text) => setFormData({ ...formData, description: text })}
             placeholder="Npr. Kupovina opreme..."
           />
         </View>
@@ -587,13 +617,12 @@ export default function FinansijeScreen() {
               keyboardType="numeric"
             />
           </View>
-
           <View style={styles.formHalf}>
             <Input
               label="Datum"
               value={formData.date}
               onChangeText={(text) => setFormData({ ...formData, date: text })}
-              placeholder="DD/MM/YYYY"
+              placeholder="YYYY-MM-DD"
             />
           </View>
         </View>
@@ -610,15 +639,7 @@ export default function FinansijeScreen() {
         </View>
 
         <View style={styles.modalButtons}>
-          <Button
-            title="Otkaži"
-            onPress={() => {
-              setModalVisible(false);
-              resetForm();
-            }}
-            variant="secondary"
-            style={{ flex: 1 }}
-          />
+          <Button title="Otkaži" onPress={() => { setModalVisible(false); resetForm(); }} variant="secondary" style={{ flex: 1 }} />
           <Button
             title={editingExpense || editingIncome ? "Sačuvaj" : "Dodaj"}
             onPress={handleSave}
@@ -632,266 +653,380 @@ export default function FinansijeScreen() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  loadingContainer: {
+  content: {
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.xl,
+  },
+  centered: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: COLORS.background,
+    padding: SPACING.xxxl,
   },
-  loadingText: {
+  errorText: {
     marginTop: SPACING.md,
     fontSize: FONT_SIZE.md,
-    color: COLORS.textSecondary,
+    color: COLORS.danger,
+    textAlign: "center",
   },
-  summaryContainer: {
+
+  // ── Profit Hero ────────────────────────────
+  profitHero: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    borderTopWidth: 3,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    ...SHADOW.md,
+  },
+  profitHeroTop: {
     flexDirection: "row",
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    gap: SPACING.sm,
-  },
-  summaryCard: {
-    flex: 1,
+    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.sm,
-  },
-  summaryIconContainer: {
     marginBottom: SPACING.sm,
   },
-  summaryLabel: {
-    fontSize: FONT_SIZE.sm,
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: "700",
     color: COLORS.textSecondary,
-    marginTop: SPACING.xs,
-    marginBottom: SPACING.sm,
-    fontWeight: "500",
+    letterSpacing: 1.1,
   },
-  summaryAmount: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: "bold",
+  profitChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 3,
+    borderRadius: RADIUS.full,
   },
-  profitCard: {
-    backgroundColor: COLORS.success,
-  },
-  lossCard: {
-    backgroundColor: COLORS.danger,
-  },
-  profitLabel: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.surface,
-    marginTop: SPACING.xs,
-    marginBottom: SPACING.sm,
-    fontWeight: "500",
+  profitChipText: {
+    fontSize: 11,
+    fontWeight: "600",
   },
   profitAmount: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: "bold",
-    color: COLORS.surface,
+    fontSize: FONT_SIZE.xxl,
+    fontWeight: "700",
+    letterSpacing: -0.5,
   },
-  categorySection: {
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.xl,
+  profitCurrency: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: "500",
+    color: COLORS.textSecondary,
   },
-  sectionHeader: {
+
+  // ── Split Row ──────────────────────────────
+  splitRow: {
     flexDirection: "row",
+    gap: SPACING.md,
+    marginBottom: SPACING.xxl,
+  },
+  splitCard: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    borderTopWidth: 3,
+    padding: SPACING.lg,
+    ...SHADOW.md,
+  },
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.md,
     alignItems: "center",
-    gap: SPACING.sm,
+    justifyContent: "center",
+    marginBottom: SPACING.sm,
+  },
+  splitEyebrow: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: COLORS.textSecondary,
+    letterSpacing: 1.0,
+    marginBottom: SPACING.xs,
+  },
+  splitAmount: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+  },
+  splitCurrency: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: "500",
+    color: COLORS.textSecondary,
+  },
+  splitCount: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+
+  // ── Section Label ──────────────────────────
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: COLORS.textSecondary,
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+    marginBottom: SPACING.md,
+    marginTop: SPACING.xxl,
+  },
+
+  // ── Generic Card ───────────────────────────
+  card: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    ...SHADOW.md,
+  },
+  cardTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.sm,
+  },
+
+  // ── Tab Toggle ─────────────────────────────
+  tabContainer: {
+    flexDirection: "row",
+    backgroundColor: COLORS.borderMedium,
+    borderRadius: RADIUS.lg,
+    padding: 3,
     marginBottom: SPACING.md,
   },
-  sectionTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
+  tabBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.xs,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.md,
   },
+  tabBtnActive: {
+    backgroundColor: COLORS.success,
+    ...SHADOW.sm,
+  },
+  tabBtnActiveExpense: {
+    backgroundColor: COLORS.danger,
+    ...SHADOW.sm,
+  },
+  tabText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+  tabTextActive: {
+    color: COLORS.surface,
+  },
+  tabBadge: {
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: RADIUS.full,
+    minWidth: 22,
+    alignItems: "center",
+  },
+  tabBadgeActive: {
+    backgroundColor: "rgba(255,255,255,0.25)",
+  },
+  tabBadgeActiveExpense: {
+    backgroundColor: "rgba(255,255,255,0.25)",
+  },
+  tabBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: COLORS.textSecondary,
+  },
+  tabBadgeTextActive: {
+    color: COLORS.surface,
+  },
+
+  // ── Category Breakdown ─────────────────────
   categoryCard: {
-    overflow: "hidden",
-  },
-  divider: {
-    height: 2,
-    backgroundColor: COLORS.primary,
-    marginHorizontal: SPACING.lg,
-    marginVertical: SPACING.xxl,
-    borderRadius: 1,
-    opacity: 0.3,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+    ...SHADOW.sm,
   },
   categoryRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderMedium,
-  },
-  categoryRowLast: {
-    borderBottomWidth: 0,
-  },
-  categoryLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+    borderBottomColor: COLORS.border,
     gap: SPACING.md,
   },
-  categoryDot: {
-    width: SPACING.md,
-    height: SPACING.md,
-    borderRadius: 6,
+  catIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: RADIUS.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  categoryMiddle: {
+    flex: 1,
   },
   categoryName: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textPrimary,
     fontWeight: "500",
+    color: COLORS.textPrimary,
+    marginBottom: 5,
+  },
+  categoryBarTrack: {
+    height: 4,
+    backgroundColor: COLORS.border,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  categoryBarFill: {
+    height: "100%",
+    borderRadius: 2,
   },
   categoryAmount: {
     fontSize: FONT_SIZE.sm,
-    fontWeight: "600",
-    color: COLORS.primaryDark,
-  },
-  listHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    marginTop: SPACING.sm,
-  },
-  countBadge: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.md,
-    minWidth: 32,
-    alignItems: "center",
-  },
-  countBadgeText: {
-    fontSize: FONT_SIZE.sm,
     fontWeight: "700",
-    color: COLORS.surface,
+    minWidth: 70,
+    textAlign: "right",
   },
-  scrollView: {
-    flex: 1,
-  },
-  emptySection: {
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
-  },
-  itemCard: {
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    borderLeftWidth: 4,
-    borderLeftColor: "transparent",
-  },
-  itemHeader: {
+
+  // ── Transaction Card ───────────────────────
+  txCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: SPACING.md,
-  },
-  itemLeft: {
-    flex: 1,
-    gap: SPACING.sm,
-  },
-  categoryBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.md,
+    gap: SPACING.md,
+    marginBottom: SPACING.sm,
     ...SHADOW.sm,
   },
-  categoryBadgeText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: "700",
-    color: COLORS.surface,
-    letterSpacing: 0.3,
+  txIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
-  itemDescription: {
+  txMiddle: {
+    flex: 1,
+    minWidth: 0,
+  },
+  txDescription: {
     fontSize: FONT_SIZE.md,
     fontWeight: "600",
     color: COLORS.textPrimary,
-    lineHeight: 22,
+    marginBottom: 5,
   },
-  incomeAmount: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: "800",
-    color: COLORS.success,
-    letterSpacing: 0.2,
-  },
-  expenseAmount: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: "800",
-    color: COLORS.danger,
-    letterSpacing: 0.2,
-  },
-  itemFooter: {
+  txMeta: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: SPACING.sm,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    marginTop: SPACING.xs,
+    gap: SPACING.sm,
   },
-  itemDate: {
+  txCategoryChip: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: RADIUS.full,
+  },
+  txCategoryText: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.2,
+  },
+  txDate: {
     fontSize: FONT_SIZE.xs,
     color: COLORS.textMuted,
     fontWeight: "500",
   },
-  itemActions: {
-    flexDirection: "row",
-    gap: SPACING.sm,
+  txNotes: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    fontStyle: "italic",
+    marginTop: 4,
   },
-  actionButton: {
-    padding: SPACING.sm,
+  txRight: {
+    alignItems: "flex-end",
+    flexShrink: 0,
+  },
+  txAmountIncome: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: "800",
+    color: COLORS.success,
+    letterSpacing: -0.3,
+  },
+  txAmountExpense: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: "800",
+    color: COLORS.danger,
+    letterSpacing: -0.3,
+  },
+  txCurrency: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+    marginBottom: SPACING.sm,
+  },
+  txActions: {
+    flexDirection: "row",
+    gap: SPACING.xs,
+  },
+  txActionBtn: {
+    width: 30,
+    height: 30,
     borderRadius: RADIUS.sm,
     backgroundColor: COLORS.border,
-  },
-  itemNotes: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.md,
-    paddingTop: SPACING.md,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    fontStyle: "italic",
-    lineHeight: 18,
-  },
-  fabContainer: {
-    position: "absolute",
-    bottom: SPACING.xxl,
-    right: SPACING.lg,
-    flexDirection: "row",
-    gap: SPACING.md,
-  },
-  addIncomeButton: {
-    height: 52,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: 28,
-    backgroundColor: COLORS.success,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: SPACING.sm,
-    ...SHADOW.fab,
   },
-  addExpenseButton: {
-    height: 52,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: 28,
+
+  // ── Bottom Action Row ──────────────────────
+  actionRow: {
+    flexDirection: "row",
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.lg,
+    paddingBottom: SPACING.xxl,
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: SPACING.md,
+  },
+  addExpenseBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: RADIUS.lg,
     backgroundColor: COLORS.danger,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: SPACING.sm,
-    ...SHADOW.fab,
+    ...SHADOW.sm,
   },
-  addButtonText: {
+  addIncomeBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.success,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.sm,
+    ...SHADOW.sm,
+  },
+  addBtnText: {
     color: COLORS.surface,
-    fontSize: FONT_SIZE.md,
+    fontSize: FONT_SIZE.sm,
     fontWeight: "700",
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
+
+  // ── Modal Form ─────────────────────────────
   formSection: {
     marginBottom: SPACING.lg,
   },

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Alert } from "react-native";
+import { View, StyleSheet, Alert } from "react-native";
+import AppText from "./AppText";
 import { Ionicons } from "@expo/vector-icons";
 import Button from "./Button";
 import { useAuth } from "../context/AuthContext";
@@ -29,10 +30,10 @@ export default function LoginScreen() {
         <View style={styles.iconCircle}>
           <Ionicons name="flower" size={48} color={COLORS.primary} />
         </View>
-        <Text style={styles.title}>Pčelinjak Ljubojević</Text>
-        <Text style={styles.subtitle}>
+        <AppText style={styles.title}>Pčelinjak Ljubojević</AppText>
+        <AppText style={styles.subtitle}>
           Prijavite se da pristupite aplikaciji
-        </Text>
+        </AppText>
       </View>
 
       <View style={styles.buttonContainer}>

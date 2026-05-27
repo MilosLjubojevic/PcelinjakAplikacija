@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Image, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/designTokens';
@@ -68,7 +69,7 @@ export default function InspectionPhotoPicker({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Fotografije ({photos.length}/{maxPhotos})</Text>
+      <AppText style={styles.label}>Fotografije ({photos.length}/{maxPhotos})</AppText>
 
       {photos.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoScroll}>
@@ -89,11 +90,11 @@ export default function InspectionPhotoPicker({
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.addButton} onPress={takePhoto}>
           <Ionicons name="camera" size={20} color={COLORS.primary} />
-          <Text style={styles.addButtonText}>Kamera</Text>
+          <AppText style={styles.addButtonText}>Kamera</AppText>
         </TouchableOpacity>
         <TouchableOpacity style={styles.addButton} onPress={pickImage}>
           <Ionicons name="images" size={20} color={COLORS.primary} />
-          <Text style={styles.addButtonText}>Galerija</Text>
+          <AppText style={styles.addButtonText}>Galerija</AppText>
         </TouchableOpacity>
       </View>
     </View>

@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import {
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
   ActivityIndicator,
@@ -10,6 +9,7 @@ import {
   Linking,
   RefreshControl,
 } from "react-native";
+import AppText from "../components/AppText";
 import { Ionicons } from "@expo/vector-icons";
 import { useSupabase } from "../context/SupabaseContext";
 import { OrderWithItems } from "../types";
@@ -126,7 +126,7 @@ export default function OrdersScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Učitavanje...</Text>
+        <AppText style={styles.loadingText}>Učitavanje...</AppText>
       </View>
     );
   }
@@ -135,12 +135,12 @@ export default function OrdersScreen() {
     return (
       <View style={styles.errorContainer}>
         <Ionicons name="settings-outline" size={64} color={COLORS.primary} />
-        <Text style={styles.configTitle}>Supabase nije konfigurisan</Text>
-        <Text style={styles.configText}>
+        <AppText style={styles.configTitle}>Supabase nije konfigurisan</AppText>
+        <AppText style={styles.configText}>
           Otvorite utils/supabase.ts i dodajte vaše Supabase kredencijale:{"\n\n"}
           - SUPABASE_URL{"\n"}
           - SUPABASE_ANON_KEY
-        </Text>
+        </AppText>
       </View>
     );
   }
@@ -149,7 +149,7 @@ export default function OrdersScreen() {
     return (
       <View style={styles.errorContainer}>
         <Ionicons name="alert-circle" size={64} color={COLORS.danger} />
-        <Text style={styles.errorText}>{ordersError}</Text>
+        <AppText style={styles.errorText}>{ordersError}</AppText>
         <Button title="Pokušaj ponovo" onPress={fetchOrders} />
       </View>
     );
@@ -161,22 +161,22 @@ export default function OrdersScreen() {
       <Card style={styles.summaryCard}>
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Na čekanju</Text>
-            <Text style={[styles.summaryValue, { color: COLORS.primary }]}>
+            <AppText style={styles.summaryLabel}>Na čekanju</AppText>
+            <AppText style={[styles.summaryValue, { color: COLORS.primary }]}>
               {pendingCount}
-            </Text>
+            </AppText>
           </View>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Poslato</Text>
-            <Text style={[styles.summaryValue, { color: COLORS.success }]}>
+            <AppText style={styles.summaryLabel}>Poslato</AppText>
+            <AppText style={[styles.summaryValue, { color: COLORS.success }]}>
               {sentCount}
-            </Text>
+            </AppText>
           </View>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Ukupno</Text>
-            <Text style={styles.summaryValue}>
+            <AppText style={styles.summaryLabel}>Ukupno</AppText>
+            <AppText style={styles.summaryValue}>
               {totalRevenue.toLocaleString("sr-RS")} KM
-            </Text>
+            </AppText>
           </View>
         </View>
       </Card>
@@ -187,7 +187,7 @@ export default function OrdersScreen() {
           style={[styles.filterTab, filter === "all" && styles.filterTabActive]}
           onPress={() => setFilter("all")}
         >
-          <Text
+          <AppText
             style={[
               styles.filterTabText,
               filter === "all" && styles.filterTabTextActive,
@@ -197,7 +197,7 @@ export default function OrdersScreen() {
             minimumFontScale={0.8}
           >
             Sve ({orders.length})
-          </Text>
+          </AppText>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
@@ -206,7 +206,7 @@ export default function OrdersScreen() {
           ]}
           onPress={() => setFilter("pending")}
         >
-          <Text
+          <AppText
             style={[
               styles.filterTabText,
               filter === "pending" && styles.filterTabTextActive,
@@ -216,13 +216,13 @@ export default function OrdersScreen() {
             minimumFontScale={0.8}
           >
             Na čekanju ({pendingCount})
-          </Text>
+          </AppText>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.filterTab, filter === "sent" && styles.filterTabActive]}
           onPress={() => setFilter("sent")}
         >
-          <Text
+          <AppText
             style={[
               styles.filterTabText,
               filter === "sent" && styles.filterTabTextActive,
@@ -232,7 +232,7 @@ export default function OrdersScreen() {
             minimumFontScale={0.8}
           >
             Poslato ({sentCount})
-          </Text>
+          </AppText>
         </TouchableOpacity>
       </View>
 
@@ -265,9 +265,9 @@ export default function OrdersScreen() {
                 <Card style={styles.orderCard}>
                   <View style={styles.orderHeader}>
                     <View style={styles.orderTitleRow}>
-                      <Text style={styles.customerName}>
+                      <AppText style={styles.customerName}>
                         {order.name} {order.lastname}
-                      </Text>
+                      </AppText>
                       <View
                         style={[
                           styles.statusBadge,
@@ -276,9 +276,9 @@ export default function OrdersScreen() {
                           },
                         ]}
                       >
-                        <Text style={styles.statusText}>
+                        <AppText style={styles.statusText}>
                           {order.sent ? "Poslato" : "Na čekanju"}
-                        </Text>
+                        </AppText>
                       </View>
                     </View>
                   </View>
@@ -286,28 +286,28 @@ export default function OrdersScreen() {
                   <View style={styles.orderDetails}>
                     <View style={styles.detailRow}>
                       <Ionicons name="location" size={16} color={COLORS.textSecondary} />
-                      <Text style={styles.detailText} numberOfLines={1}>
+                      <AppText style={styles.detailText} numberOfLines={1}>
                         {order.address}, {order.city}
-                      </Text>
+                      </AppText>
                     </View>
                     <View style={styles.detailRow}>
                       <Ionicons name="calendar" size={16} color={COLORS.textSecondary} />
-                      <Text style={styles.detailText}>
+                      <AppText style={styles.detailText}>
                         {formatDate(order.created_at)}
-                      </Text>
+                      </AppText>
                     </View>
                     <View style={styles.detailRow}>
                       <Ionicons name="cube" size={16} color={COLORS.textSecondary} />
-                      <Text style={styles.detailText}>
+                      <AppText style={styles.detailText}>
                         {order.items.length} artikala
-                      </Text>
+                      </AppText>
                     </View>
                   </View>
 
                   <View style={styles.orderFooter}>
-                    <Text style={styles.totalAmount}>
+                    <AppText style={styles.totalAmount}>
                       {order.total.toLocaleString("sr-RS")} KM
-                    </Text>
+                    </AppText>
                     <TouchableOpacity
                       style={[
                         styles.quickStatusButton,
@@ -330,14 +330,14 @@ export default function OrdersScreen() {
                             size={16}
                             color={order.sent ? COLORS.textSecondary : COLORS.surface}
                           />
-                          <Text
+                          <AppText
                             style={[
                               styles.quickStatusText,
                               { color: order.sent ? COLORS.textSecondary : COLORS.surface },
                             ]}
                           >
                             {order.sent ? "Poništi" : "Označi poslato"}
-                          </Text>
+                          </AppText>
                         </>
                       )}
                     </TouchableOpacity>
@@ -367,10 +367,10 @@ export default function OrdersScreen() {
           <>
             {/* Customer Info */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Kupac</Text>
-              <Text style={styles.customerFullName}>
+              <AppText style={styles.sectionTitle}>Kupac</AppText>
+              <AppText style={styles.customerFullName}>
                 {selectedOrder.name} {selectedOrder.lastname}
-              </Text>
+              </AppText>
 
               <View style={styles.contactRow}>
                 <TouchableOpacity
@@ -378,9 +378,9 @@ export default function OrdersScreen() {
                   onPress={() => handleCallCustomer(selectedOrder.phone)}
                 >
                   <Ionicons name="call" size={20} color={COLORS.success} />
-                  <Text style={styles.contactButtonText}>
+                  <AppText style={styles.contactButtonText}>
                     {selectedOrder.phone}
-                  </Text>
+                  </AppText>
                 </TouchableOpacity>
               </View>
 
@@ -390,66 +390,66 @@ export default function OrdersScreen() {
                   onPress={() => handleEmailCustomer(selectedOrder.email)}
                 >
                   <Ionicons name="mail" size={20} color={COLORS.info} />
-                  <Text style={styles.contactButtonText}>
+                  <AppText style={styles.contactButtonText}>
                     {selectedOrder.email}
-                  </Text>
+                  </AppText>
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* Delivery Address */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Adresa dostave</Text>
+              <AppText style={styles.sectionTitle}>Adresa dostave</AppText>
               <View style={styles.addressContainer}>
                 <Ionicons name="location" size={20} color={COLORS.danger} />
-                <Text style={styles.addressText}>
+                <AppText style={styles.addressText}>
                   {selectedOrder.address}, {selectedOrder.city}
-                </Text>
+                </AppText>
               </View>
             </View>
 
             {/* Order Items */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Stavke</Text>
+              <AppText style={styles.sectionTitle}>Stavke</AppText>
               {selectedOrder.items.map((item, index) => (
                 <View key={item.id || index} style={styles.orderItem}>
                   <View style={styles.orderItemInfo}>
-                    <Text style={styles.orderItemName}>
+                    <AppText style={styles.orderItemName}>
                       {item.product?.product_name || "Nepoznati proizvod"}
-                    </Text>
-                    <Text style={styles.orderItemOption}>
+                    </AppText>
+                    <AppText style={styles.orderItemOption}>
                       {item.price_option?.size || "N/A"} x {item.quantity}
-                    </Text>
+                    </AppText>
                   </View>
-                  <Text style={styles.orderItemPrice}>
+                  <AppText style={styles.orderItemPrice}>
                     {(
                       (parseFloat(item.price_option?.price || "0") *
                         item.quantity)
                     ).toLocaleString("sr-RS")}{" "}
                     KM
-                  </Text>
+                  </AppText>
                 </View>
               ))}
 
               <View style={styles.totalSection}>
-                <Text style={styles.totalLabel}>Ukupno:</Text>
-                <Text style={styles.totalValue}>
+                <AppText style={styles.totalLabel}>Ukupno:</AppText>
+                <AppText style={styles.totalValue}>
                   {selectedOrder.total.toLocaleString("sr-RS")} KM
-                </Text>
+                </AppText>
               </View>
             </View>
 
             {/* Order Info */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Informacije</Text>
+              <AppText style={styles.sectionTitle}>Informacije</AppText>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Datum:</Text>
-                <Text style={styles.infoValue}>
+                <AppText style={styles.infoLabel}>Datum:</AppText>
+                <AppText style={styles.infoValue}>
                   {formatDate(selectedOrder.created_at)}
-                </Text>
+                </AppText>
               </View>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Status:</Text>
+                <AppText style={styles.infoLabel}>Status:</AppText>
                 <View
                   style={[
                     styles.statusBadgeLarge,
@@ -465,9 +465,9 @@ export default function OrdersScreen() {
                     size={16}
                     color={COLORS.surface}
                   />
-                  <Text style={styles.statusTextLarge}>
+                  <AppText style={styles.statusTextLarge}>
                     {selectedOrder.sent ? "Poslato" : "Na čekanju"}
-                  </Text>
+                  </AppText>
                 </View>
               </View>
             </View>

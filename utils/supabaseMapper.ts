@@ -45,6 +45,7 @@ export interface DbHive {
   has_queen: boolean | null;
   queen_id: string | null;
   last_inspection: string | null;
+  scheduled_inspection: string | null;
   frame_count: number | null;
   is_harvested: boolean | null;
   has_pollen: boolean | null;
@@ -274,6 +275,7 @@ export function hiveToDb(hive: Hive, userId: string): Omit<DbHive, 'created_at' 
     has_queen: hive.type === 'swarm' ? null : (hive.hasQueen ?? true),
     queen_id: hive.queenId || null,
     last_inspection: toIso(hive.lastInspection),
+    scheduled_inspection: toIso(hive.scheduledInspection),
     frame_count: hive.type === 'swarm' ? null : (hive.frameCount ?? 10),
     is_harvested: hive.type === 'swarm' ? null : (hive.isHarvested ?? false),
     has_pollen: hive.type === 'swarm' ? null : (hive.hasPollen ?? false),
@@ -302,6 +304,7 @@ export function dbToHive(
     hasQueen: db.has_queen ?? undefined,
     queenId: db.queen_id || undefined,
     lastInspection: toDate(db.last_inspection),
+    scheduledInspection: toDate(db.scheduled_inspection),
     notes: notes.length > 0 ? notes : undefined,
     frameCount: db.frame_count ?? (hiveType === 'hive' ? 10 : undefined),
     isHarvested: db.is_harvested ?? (hiveType === 'hive' ? false : undefined),

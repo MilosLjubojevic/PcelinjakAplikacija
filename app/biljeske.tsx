@@ -1,12 +1,12 @@
-import React, { useState, useMemo } from "react";
+﻿import React, { useState, useMemo } from "react";
 import {
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
   Alert,
 } from "react-native";
+import AppText from "../components/AppText";
 import { Ionicons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
 import Modal from "../components/Modal";
@@ -161,9 +161,9 @@ export default function BiljeskeScreen() {
                     color={COLORS.primary}
                     style={styles.noteIcon}
                   />
-                  <Text style={styles.noteTitle} numberOfLines={1}>
+                  <AppText style={styles.noteTitle} numberOfLines={1}>
                     {note.title}
-                  </Text>
+                  </AppText>
                 </View>
                 <TouchableOpacity
                   onPress={() => handleDelete(note)}
@@ -175,9 +175,9 @@ export default function BiljeskeScreen() {
               </View>
 
               {note.content.length > 0 && (
-                <Text style={styles.noteContent} numberOfLines={3}>
+                <AppText style={styles.noteContent} numberOfLines={3}>
                   {note.content}
-                </Text>
+                </AppText>
               )}
 
               <View style={styles.noteFooter}>
@@ -187,10 +187,10 @@ export default function BiljeskeScreen() {
                     size={14}
                     color={COLORS.primaryDark}
                   />
-                  <Text style={styles.dateText}>{formatDate(note.date)}</Text>
+                  <AppText style={styles.dateText}>{formatDate(note.date)}</AppText>
                 </View>
                 {note.updatedAt.getTime() !== note.createdAt.getTime() && (
-                  <Text style={styles.editedText}>Izmijenjeno</Text>
+                  <AppText style={styles.editedText}>Izmijenjeno</AppText>
                 )}
               </View>
             </TouchableOpacity>

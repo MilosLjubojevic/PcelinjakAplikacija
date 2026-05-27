@@ -2,10 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   Modal,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import AppText from "./AppText";
 import { COLORS, FONT_SIZE, RADIUS, SHADOW, SPACING } from "../constants/designTokens";
 
 interface ConfirmDeleteModalProps {
@@ -38,17 +38,17 @@ export default function ConfirmDeleteModal({
           </View>
 
           {/* Text */}
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
+          <AppText style={styles.title}>{title}</AppText>
+          <AppText style={styles.message}>{message}</AppText>
 
           {/* Buttons */}
           <View style={styles.buttons}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} activeOpacity={0.75}>
-              <Text style={styles.cancelText}>Otkaži</Text>
+              <AppText style={styles.cancelText}>Otkaži</AppText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.deleteBtn} onPress={onConfirm} activeOpacity={0.75}>
               <Ionicons name="trash-outline" size={16} color={COLORS.surface} />
-              <Text style={styles.deleteText}>Obriši</Text>
+              <AppText style={styles.deleteText}>Obriši</AppText>
             </TouchableOpacity>
           </View>
         </View>

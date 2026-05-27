@@ -1,21 +1,33 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   View,
-  Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Switch,
   Alert,
   ActivityIndicator,
 } from "react-native";
+import AppText from "../components/AppText";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useSupabase } from "../context/SupabaseContext";
+import { useApp } from "../context/AppContext";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import Input from "../components/Input";
 import Modal from "../components/Modal";
 import EmptyState from "../components/EmptyState";
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from "../constants/designTokens";
+import {
+  requestNotificationPermissions,
+  scheduleInspectionNotifications,
+  cancelAllInspectionNotifications,
+} from "../utils/notifications";
+
+const NOTIF_KEY = "@notifications_enabled";
+const NOTIF_TIME_KEY = "@notifications_time";
 
 export default function AdminScreen() {
   const {
@@ -26,15 +38,77 @@ export default function AdminScreen() {
     addAllowedEmail,
     deleteAllowedEmail,
   } = useSupabase();
+  const { state } = useApp();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(true);
+  const [notifTime, setNotifTime] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(8, 0, 0, 0);
+    return d;
+  });
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
   useEffect(() => {
     fetchAllowedEmails();
   }, []);
+
+  useEffect(() => {
+    Promise.all([
+      AsyncStorage.getItem(NOTIF_KEY),
+      AsyncStorage.getItem(NOTIF_TIME_KEY),
+    ]).then(([enabled, time]) => {
+      setNotificationsEnabled(enabled !== "false");
+      if (time) {
+        const [h, m] = time.split(":").map(Number);
+        const d = new Date();
+        d.setHours(h, m, 0, 0);
+        setNotifTime(d);
+      }
+      setNotifLoading(false);
+    });
+  }, []);
+
+  const handleNotifToggle = async (value: boolean) => {
+    setNotificationsEnabled(value);
+    await AsyncStorage.setItem(NOTIF_KEY, value ? "true" : "false");
+
+    if (value) {
+      const granted = await requestNotificationPermissions();
+      if (!granted) {
+        Alert.alert(
+          "Dozvola odbijena",
+          "Omogućite notifikacije u podešavanjima uređaja da biste primali podsjetnik za pregled košnica."
+        );
+        setNotificationsEnabled(false);
+        await AsyncStorage.setItem(NOTIF_KEY, "false");
+        return;
+      }
+      await scheduleInspectionNotifications(state.locations, notifTime.getHours(), notifTime.getMinutes());
+    } else {
+      await cancelAllInspectionNotifications();
+    }
+  };
+
+  const handleTimeChange = async (_: any, selected?: Date) => {
+    setShowTimePicker(false);
+    if (!selected) return;
+    setNotifTime(selected);
+    const h = selected.getHours();
+    const m = selected.getMinutes();
+    await AsyncStorage.setItem(NOTIF_TIME_KEY, `${h}:${m}`);
+    if (notificationsEnabled) {
+      await scheduleInspectionNotifications(state.locations, h, m);
+    }
+  };
+
+  const formatTime = (d: Date) =>
+    `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
   const handleAdd = async () => {
     const trimmed = newEmail.trim().toLowerCase();
@@ -91,7 +165,7 @@ export default function AdminScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Učitavanje...</Text>
+        <AppText style={styles.loadingText}>Učitavanje...</AppText>
       </View>
     );
   }
@@ -100,7 +174,7 @@ export default function AdminScreen() {
     return (
       <View style={styles.loadingContainer}>
         <Ionicons name="alert-circle" size={64} color={COLORS.danger} />
-        <Text style={styles.errorText}>{allowedEmailsError}</Text>
+        <AppText style={styles.errorText}>{allowedEmailsError}</AppText>
         <Button title="Pokušaj ponovo" onPress={fetchAllowedEmails} />
       </View>
     );
@@ -111,11 +185,62 @@ export default function AdminScreen() {
       <Card style={styles.summaryCard}>
         <View style={styles.summaryRow}>
           <Ionicons name="mail" size={24} color={COLORS.primary} />
-          <Text style={styles.summaryText}>
+          <AppText style={styles.summaryText}>
             Ukupno dozvoljenih email-ova:{" "}
-            <Text style={styles.summaryCount}>{allowedEmails.length}</Text>
-          </Text>
+            <AppText style={styles.summaryCount}>{allowedEmails.length}</AppText>
+          </AppText>
         </View>
+      </Card>
+
+      <Card style={styles.notifCard}>
+        <View style={styles.notifRow}>
+          <View style={styles.notifInfo}>
+            <Ionicons name="notifications-outline" size={24} color={COLORS.primary} />
+            <View style={styles.notifTextContainer}>
+              <AppText style={styles.notifTitle}>Notifikacije za pregled</AppText>
+              <AppText style={styles.notifSubtitle}>
+                Podsjetnik za zakazane preglede košnica
+              </AppText>
+            </View>
+          </View>
+          {notifLoading ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={handleNotifToggle}
+              trackColor={{ false: COLORS.border, true: COLORS.primary }}
+              thumbColor={COLORS.surface}
+            />
+          )}
+        </View>
+
+        {!notifLoading && (
+          <TouchableOpacity
+            style={[styles.timeRow, !notificationsEnabled && styles.timeRowDisabled]}
+            onPress={() => notificationsEnabled && setShowTimePicker(true)}
+            activeOpacity={notificationsEnabled ? 0.7 : 1}
+          >
+            <Ionicons name="time-outline" size={20} color={notificationsEnabled ? COLORS.textSecondary : COLORS.textMuted} />
+            <AppText style={[styles.timeLabel, !notificationsEnabled && styles.timeLabelDisabled]}>
+              Vrijeme slanja
+            </AppText>
+            <AppText style={[styles.timeValue, !notificationsEnabled && styles.timeLabelDisabled]}>
+              {formatTime(notifTime)}
+            </AppText>
+            <Ionicons name="chevron-forward" size={16} color={notificationsEnabled ? COLORS.textMuted : COLORS.border} />
+          </TouchableOpacity>
+        )}
+
+        {showTimePicker && (
+          <DateTimePicker
+            value={notifTime}
+            mode="time"
+            is24Hour={true}
+            display="default"
+            onChange={handleTimeChange}
+          />
+        )}
       </Card>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -134,10 +259,10 @@ export default function AdminScreen() {
                 <View style={styles.emailInfo}>
                   <Ionicons name="person-circle-outline" size={32} color={COLORS.primaryDark} />
                   <View style={styles.emailTextContainer}>
-                    <Text style={styles.emailText}>{item.email}</Text>
-                    <Text style={styles.dateText}>
+                    <AppText style={styles.emailText}>{item.email}</AppText>
+                    <AppText style={styles.dateText}>
                       Dodato: {new Date(item.created_at).toLocaleDateString("sr-RS")}
-                    </Text>
+                    </AppText>
                   </View>
                 </View>
                 <TouchableOpacity
@@ -232,6 +357,59 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: FONT_SIZE.lg,
     color: COLORS.primary,
+  },
+  notifCard: {
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
+  },
+  notifRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  notifInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    gap: SPACING.md,
+  },
+  notifTextContainer: {
+    flex: 1,
+  },
+  notifTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: "600",
+    color: COLORS.textPrimary,
+  },
+  notifSubtitle: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  timeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  timeRowDisabled: {
+    opacity: 0.4,
+  },
+  timeLabel: {
+    flex: 1,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
+  },
+  timeValue: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: "600",
+    color: COLORS.primary,
+  },
+  timeLabelDisabled: {
+    color: COLORS.textMuted,
   },
   scrollView: {
     flex: 1,

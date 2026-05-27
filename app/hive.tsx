@@ -4,11 +4,11 @@ import { useState, useCallback } from "react";
 import {
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
   useWindowDimensions,
 } from "react-native";
+import AppText from "../components/AppText";
 import Button from "../components/Button";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 import DatePicker from "../components/DatePicker";
@@ -636,7 +636,7 @@ export default function HivesScreen() {
     return (
       <View style={styles.loadingContainer}>
         <Ionicons name="alert-circle" size={48} color={COLORS.danger} />
-        <Text style={styles.loadingText}>{error}</Text>
+        <AppText style={styles.loadingText}>{error}</AppText>
         <Button title="Pokušaj ponovo" onPress={refreshData} style={{ marginTop: SPACING.md }} />
       </View>
     );
@@ -699,15 +699,15 @@ export default function HivesScreen() {
                 color={isSelected ? COLORS.surface : COLORS.textPrimary}
               />
               <View style={styles.locationInfo}>
-                <Text
+                <AppText
                   style={[
                     styles.locationName,
                     isSelected && styles.locationNameActive,
                   ]}
                 >
                   {location.name}
-                </Text>
-                <Text
+                </AppText>
+                <AppText
                   style={[
                     styles.locationStats,
                     isSelected && styles.locationStatsActive,
@@ -717,7 +717,7 @@ export default function HivesScreen() {
                   minimumFontScale={0.8}
                 >
                   {stats.totalRows} redova • {stats.totalFilled}/{stats.totalSlots} mjesta
-                </Text>
+                </AppText>
               </View>
             </TouchableOpacity>
           );
@@ -731,43 +731,43 @@ export default function HivesScreen() {
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { borderColor: "#16A34A", backgroundColor: "#DCFCE7" }]} />
-          <Text style={styles.legendLabel}>Zdravo</Text>
+          <AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Zdravo</AppText>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { borderColor: "#DC2626", backgroundColor: "#FEE2E2" }]} />
-          <Text style={styles.legendLabel}>Loše</Text>
+          <AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Loše</AppText>
         </View>
         <View style={styles.legendItem}>
           <Ionicons name="checkmark-circle" size={12} color="#7C3AED" />
-          <Text style={styles.legendLabel}>Ima maticu</Text>
+          <AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Ima maticu</AppText>
         </View>
         <View style={styles.legendItem}>
           <Ionicons name="close-circle" size={12} color="#EA580C" />
-          <Text style={styles.legendLabel}>Nema matice</Text>
+          <AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Nema matice</AppText>
         </View>
         <View style={styles.legendItem}>
           <Ionicons name="flower" size={12} color={COLORS.primary} />
-          <Text style={styles.legendLabel}>Polen</Text>
+          <AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Polen</AppText>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { borderColor: "#9CA3AF", backgroundColor: "#F3F4F6" }]} />
-          <Text style={styles.legendLabel}>Roj: Prazan</Text>
+          <AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Roj: Prazan</AppText>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { borderColor: "#D97706", backgroundColor: "#FEF3C7" }]} />
-          <Text style={styles.legendLabel}>Razvija se</Text>
+          <AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Razvija se</AppText>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { borderColor: "#0891B2", backgroundColor: "#CFFAFE" }]} />
-          <Text style={styles.legendLabel}>Spreman</Text>
+          <AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Spreman</AppText>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { borderColor: "#2563EB", backgroundColor: "#DBEAFE" }]} />
-          <Text style={styles.legendLabel}>Prirodni</Text>
+          <AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Prirodni</AppText>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, { borderColor: COLORS.borderMedium, opacity: 0.5 }]} />
-          <Text style={styles.legendLabel}>Neaktivna</Text>
+          <AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Neaktivna</AppText>
         </View>
       </View>
 
@@ -801,9 +801,9 @@ export default function HivesScreen() {
                     size={FONT_SIZE.xl}
                     color={COLORS.textPrimary}
                   />
-                  <Text style={styles.rowName}>{row.name}</Text>
+                  <AppText style={styles.rowName}>{row.name}</AppText>
                   <View style={styles.rowBadge}>
-                    <Text style={styles.rowBadgeText} allowFontScaling={false}>{stats.filled}/{stats.total}</Text>
+                    <AppText style={styles.rowBadgeText} allowFontScaling={false}>{stats.filled}/{stats.total}</AppText>
                   </View>
                 </View>
 
@@ -811,15 +811,15 @@ export default function HivesScreen() {
                 <View style={styles.quickStats}>
                   <View key="hives" style={styles.statDot}>
                     <Ionicons name="grid-outline" size={12} color={COLORS.accent.hive} />
-                    <Text style={styles.statNumber} allowFontScaling={false}>{stats.hives}</Text>
+                    <AppText style={styles.statNumber} allowFontScaling={false}>{stats.hives}</AppText>
                   </View>
                   <View key="swarms" style={styles.statDot}>
                     <Ionicons name="cube-outline" size={12} color={COLORS.accent.swarm} />
-                    <Text style={styles.statNumber} allowFontScaling={false}>{stats.swarms}</Text>
+                    <AppText style={styles.statNumber} allowFontScaling={false}>{stats.swarms}</AppText>
                   </View>
                   <View key="empty" style={styles.statDot}>
                     <View style={[styles.dot, { backgroundColor: COLORS.borderMedium }]} />
-                    <Text style={styles.statNumber} allowFontScaling={false}>{stats.empty}</Text>
+                    <AppText style={styles.statNumber} allowFontScaling={false}>{stats.empty}</AppText>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -836,18 +836,18 @@ export default function HivesScreen() {
                           setSelectedHiveIds(allSelected ? new Set() : new Set(allIds));
                         }}
                       >
-                        <Text style={styles.selectionBannerLink}>
+                        <AppText style={styles.selectionBannerLink} maxFontSizeMultiplier={1} numberOfLines={1}>
                           {row.hives.length > 0 && row.hives.every((h) => selectedHiveIds.has(h.id))
                             ? 'Odznači sve'
                             : 'Odaberi sve'}
-                        </Text>
+                        </AppText>
                       </TouchableOpacity>
-                      <Text style={styles.selectionCount}>{selectedHiveIds.size} odabrano</Text>
+                      <AppText style={styles.selectionCount} maxFontSizeMultiplier={1} numberOfLines={1}>{selectedHiveIds.size} odabrano</AppText>
                       <TouchableOpacity
                         style={[styles.selectionApplyBtn, selectedHiveIds.size === 0 && { opacity: 0.4 }]}
                         onPress={() => { if (selectedHiveIds.size > 0) setBulkModalVisible(true); }}
                       >
-                        <Text style={styles.selectionApplyText}>Primijeni</Text>
+                        <AppText style={styles.selectionApplyText} maxFontSizeMultiplier={1} numberOfLines={1}>Primijeni</AppText>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -870,7 +870,7 @@ export default function HivesScreen() {
                             accessibilityLabel={`Prazan slot ${slotNum}`}
                             accessibilityHint="Pritisni da dodaš košnicu ili roj"
                           >
-                            <Text style={styles.emptySlotNumber} allowFontScaling={false}>{slotNum}</Text>
+                            <AppText style={styles.emptySlotNumber} allowFontScaling={false}>{slotNum}</AppText>
                             <Ionicons name="add" size={FONT_SIZE.sm} color={COLORS.textMuted} />
                           </TouchableOpacity>
                         );
@@ -911,7 +911,7 @@ export default function HivesScreen() {
                           accessibilityLabel={`${isSwarm ? 'Roj' : 'Košnica'} ${hive.number}`}
                           accessibilityHint={selectionMode === row.id ? "Pritisni za odabir" : "Pritisni za izmjenu, dugo drži za brisanje"}
                         >
-                          <Text
+                          <AppText
                             style={[
                               styles.hiveNumber,
                               isInactive && styles.hiveNumberInactive,
@@ -920,7 +920,7 @@ export default function HivesScreen() {
                             allowFontScaling={false}
                           >
                             {hive.number}
-                          </Text>
+                          </AppText>
                           {isSwarm ? (
                             <Ionicons
                               name="cube"
@@ -976,9 +976,9 @@ export default function HivesScreen() {
                       onPress={() => handleOpenEditRow(row)}
                     >
                       <Ionicons name="create-outline" size={SPACING.xl} color={COLORS.primary} />
-                      <Text style={[styles.rowActionText, { color: COLORS.primary }]}>
+                      <AppText style={[styles.rowActionText, { color: COLORS.primary }]}>
                         Uredi red
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.rowActionButton}
@@ -997,18 +997,18 @@ export default function HivesScreen() {
                         size={SPACING.xl}
                         color={selectionMode === row.id ? COLORS.textMuted : COLORS.success}
                       />
-                      <Text style={[styles.rowActionText, { color: selectionMode === row.id ? COLORS.textMuted : COLORS.success }]}>
+                      <AppText style={[styles.rowActionText, { color: selectionMode === row.id ? COLORS.textMuted : COLORS.success }]}>
                         {selectionMode === row.id ? 'Otkaži' : 'Odaberi'}
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.rowActionButton}
                       onPress={() => handleDeleteRow(row.id, row.name)}
                     >
                       <Ionicons name="trash-outline" size={SPACING.xl} color={COLORS.danger} />
-                      <Text style={[styles.rowActionText, { color: COLORS.danger }]}>
+                      <AppText style={[styles.rowActionText, { color: COLORS.danger }]}>
                         Obriši red
-                      </Text>
+                      </AppText>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1051,10 +1051,10 @@ export default function HivesScreen() {
 
         <View style={styles.infoBox}>
           <Ionicons name="information-circle" size={SPACING.xl} color={COLORS.primary} />
-          <Text style={styles.infoText}>
+          <AppText style={styles.infoText}>
             Biće kreiran red sa {formData.capacity || "0"} praznih mjesta.
             Košnice i rojeve dodajete klikom na prazan slot.
-          </Text>
+          </AppText>
         </View>
 
         <View style={styles.modalButtons}>
@@ -1093,7 +1093,7 @@ export default function HivesScreen() {
             style={[styles.typeSwitcherOption, styles.typeSwitcherOptionActive, { borderColor: COLORS.accent.hive }]}
           >
             <Ionicons name="grid-outline" size={18} color={COLORS.accent.hive} />
-            <Text style={[styles.typeSwitcherLabel, { color: COLORS.accent.hive }]}>Košnica</Text>
+            <AppText style={[styles.typeSwitcherLabel, { color: COLORS.accent.hive }]}>Košnica</AppText>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.typeSwitcherOption]}
@@ -1136,13 +1136,13 @@ export default function HivesScreen() {
             }}
           >
             <Ionicons name="cube-outline" size={18} color={COLORS.textMuted} />
-            <Text style={[styles.typeSwitcherLabel, { color: COLORS.textMuted }]}>Roj</Text>
+            <AppText style={[styles.typeSwitcherLabel, { color: COLORS.textMuted }]}>Roj</AppText>
           </TouchableOpacity>
         </View>
 
         {/* Opšte Informacije Section */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Opšte informacije</Text>
+          <AppText style={styles.sectionTitle}>Opšte informacije</AppText>
 
           <Input
             label="Broj košnice"
@@ -1164,7 +1164,7 @@ export default function HivesScreen() {
           />
 
           <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Ima maticu</Text>
+            <AppText style={styles.switchLabel}>Ima maticu</AppText>
             <TouchableOpacity
               style={[
                 styles.switch,
@@ -1197,7 +1197,7 @@ export default function HivesScreen() {
           />
 
           <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Aktivna košnica</Text>
+            <AppText style={styles.switchLabel}>Aktivna košnica</AppText>
             <TouchableOpacity
               style={[
                 styles.switch,
@@ -1240,10 +1240,10 @@ export default function HivesScreen() {
 
         {/* Produkcija Section */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Produkcija</Text>
+          <AppText style={styles.sectionTitle}>Produkcija</AppText>
 
           <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Vrcano</Text>
+            <AppText style={styles.switchLabel}>Vrcano</AppText>
             <TouchableOpacity
               style={[
                 styles.switch,
@@ -1266,7 +1266,7 @@ export default function HivesScreen() {
           </View>
 
           <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Polen</Text>
+            <AppText style={styles.switchLabel}>Polen</AppText>
             <TouchableOpacity
               style={[
                 styles.switch,
@@ -1290,9 +1290,9 @@ export default function HivesScreen() {
 
           {/* Harvest Dates Section */}
           <View style={styles.feedingSection}>
-            <Text style={styles.feedingLabel}>
+            <AppText style={styles.feedingLabel}>
               Vrcanja ({hiveFormData.harvestDates.length})
-            </Text>
+            </AppText>
             <DatePicker
               label="Dodaj novo vrcanje"
               value={null}
@@ -1311,7 +1311,7 @@ export default function HivesScreen() {
               <View style={styles.feedingList}>
                 {hiveFormData.harvestDates.map((date, index) => (
                   <View key={index} style={styles.feedingItem}>
-                    <Text style={styles.feedingDate}>{formatDate(date)}</Text>
+                    <AppText style={styles.feedingDate}>{formatDate(date)}</AppText>
                     <TouchableOpacity
                       onPress={() => {
                         setHiveFormData({
@@ -1334,13 +1334,13 @@ export default function HivesScreen() {
 
         {/* Održavanje Section */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Održavanje</Text>
+          <AppText style={styles.sectionTitle}>Održavanje</AppText>
 
           {/* Feeding Dates Section */}
           <View style={styles.feedingSection}>
-            <Text style={styles.feedingLabel}>
+            <AppText style={styles.feedingLabel}>
               Prihrane ({hiveFormData.feedingDates.length})
-            </Text>
+            </AppText>
             <DatePicker
               label="Dodaj novu prihranu"
               value={null}
@@ -1359,7 +1359,7 @@ export default function HivesScreen() {
               <View style={styles.feedingList}>
                 {hiveFormData.feedingDates.map((date, index) => (
                   <View key={index} style={styles.feedingItem}>
-                    <Text style={styles.feedingDate}>{formatDate(date)}</Text>
+                    <AppText style={styles.feedingDate}>{formatDate(date)}</AppText>
                     <TouchableOpacity
                       onPress={() => {
                         setHiveFormData({
@@ -1390,7 +1390,7 @@ export default function HivesScreen() {
 
         {/* Notes Section */}
         <View style={styles.notesSection}>
-          <Text style={styles.notesLabel}>Bilješke</Text>
+          <AppText style={styles.notesLabel}>Bilješke</AppText>
 
           {/* Existing notes */}
           {editingHive?.notes && Array.isArray(editingHive.notes) && editingHive.notes.length > 0 && (
@@ -1398,10 +1398,10 @@ export default function HivesScreen() {
               {editingHive.notes.map((note) => (
                 <View key={note.id} style={styles.noteItem}>
                   <View style={styles.noteContent}>
-                    <Text style={styles.noteText}>{note.text}</Text>
-                    <Text style={styles.noteDate}>
+                    <AppText style={styles.noteText}>{note.text}</AppText>
+                    <AppText style={styles.noteDate}>
                       {formatDate(note.createdAt)}
-                    </Text>
+                    </AppText>
                   </View>
                   <TouchableOpacity
                     onPress={() => handleDeleteNote(note.id)}
@@ -1465,7 +1465,7 @@ export default function HivesScreen() {
           }}
         >
           <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
-          <Text style={styles.deleteHiveButtonText}>Obriši košnicu</Text>
+          <AppText style={styles.deleteHiveButtonText}>Obriši košnicu</AppText>
         </TouchableOpacity>
       </Modal>
 
@@ -1485,16 +1485,16 @@ export default function HivesScreen() {
             onPress={() => handleAddSlotWithType('hive')}
           >
             <Ionicons name="grid-outline" size={32} color={COLORS.accent.hive} />
-            <Text style={styles.slotTypeLabel}>Košnica</Text>
-            <Text style={styles.slotTypeDesc}>Aktivna košnica za proizvodnju meda</Text>
+            <AppText style={styles.slotTypeLabel}>Košnica</AppText>
+            <AppText style={styles.slotTypeDesc}>Aktivna košnica za proizvodnju meda</AppText>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.slotTypeOption, { borderColor: COLORS.accent.swarm }]}
             onPress={() => handleAddSlotWithType('swarm')}
           >
             <Ionicons name="cube-outline" size={32} color={COLORS.accent.swarm} />
-            <Text style={styles.slotTypeLabel}>Roj</Text>
-            <Text style={styles.slotTypeDesc}>Roj u razvoju ili spreman za prodaju</Text>
+            <AppText style={styles.slotTypeLabel}>Roj</AppText>
+            <AppText style={styles.slotTypeDesc}>Roj u razvoju ili spreman za prodaju</AppText>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -1584,7 +1584,7 @@ export default function HivesScreen() {
           <View style={[styles.bulkCheckbox, bulkForm.applyType && styles.bulkCheckboxActive]}>
             {bulkForm.applyType && <Ionicons name="checkmark" size={12} color={COLORS.surface} />}
           </View>
-          <Text style={styles.bulkToggleLabel}>Promijeni tip</Text>
+          <AppText style={styles.bulkToggleLabel}>Promijeni tip</AppText>
         </TouchableOpacity>
         {bulkForm.applyType && (
           <View style={styles.typeSwitcherContainer}>
@@ -1593,14 +1593,14 @@ export default function HivesScreen() {
               onPress={() => setBulkForm({ ...bulkForm, type: 'hive' })}
             >
               <Ionicons name="grid-outline" size={18} color={bulkForm.type === 'hive' ? COLORS.accent.hive : COLORS.textMuted} />
-              <Text style={[styles.typeSwitcherLabel, { color: bulkForm.type === 'hive' ? COLORS.accent.hive : COLORS.textMuted }]}>Košnica</Text>
+              <AppText style={[styles.typeSwitcherLabel, { color: bulkForm.type === 'hive' ? COLORS.accent.hive : COLORS.textMuted }]}>Košnica</AppText>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.typeSwitcherOption, bulkForm.type === 'swarm' && styles.typeSwitcherOptionActive, bulkForm.type === 'swarm' && { borderColor: COLORS.accent.swarm }]}
               onPress={() => setBulkForm({ ...bulkForm, type: 'swarm' })}
             >
               <Ionicons name="cube-outline" size={18} color={bulkForm.type === 'swarm' ? COLORS.accent.swarm : COLORS.textMuted} />
-              <Text style={[styles.typeSwitcherLabel, { color: bulkForm.type === 'swarm' ? COLORS.accent.swarm : COLORS.textMuted }]}>Roj</Text>
+              <AppText style={[styles.typeSwitcherLabel, { color: bulkForm.type === 'swarm' ? COLORS.accent.swarm : COLORS.textMuted }]}>Roj</AppText>
             </TouchableOpacity>
           </View>
         )}
@@ -1613,7 +1613,7 @@ export default function HivesScreen() {
           <View style={[styles.bulkCheckbox, bulkForm.applyHealth && styles.bulkCheckboxActive]}>
             {bulkForm.applyHealth && <Ionicons name="checkmark" size={12} color={COLORS.surface} />}
           </View>
-          <Text style={styles.bulkToggleLabel}>Zdravlje košnice</Text>
+          <AppText style={styles.bulkToggleLabel}>Zdravlje košnice</AppText>
         </TouchableOpacity>
         {bulkForm.applyHealth && (
           <View style={styles.typeSwitcherContainer}>
@@ -1622,21 +1622,21 @@ export default function HivesScreen() {
               onPress={() => setBulkForm({ ...bulkForm, health: 'good' })}
             >
               <View style={[styles.legendSwatch, { borderColor: '#16A34A', backgroundColor: '#DCFCE7' }]} />
-              <Text style={[styles.typeSwitcherLabel, { color: bulkForm.health === 'good' ? '#16A34A' : COLORS.textMuted }]}>Dobro</Text>
+              <AppText style={[styles.typeSwitcherLabel, { color: bulkForm.health === 'good' ? '#16A34A' : COLORS.textMuted }]}>Dobro</AppText>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.typeSwitcherOption, bulkForm.health === 'bad' && styles.typeSwitcherOptionActive, bulkForm.health === 'bad' && { borderColor: '#DC2626' }]}
               onPress={() => setBulkForm({ ...bulkForm, health: 'bad' })}
             >
               <View style={[styles.legendSwatch, { borderColor: '#DC2626', backgroundColor: '#FEE2E2' }]} />
-              <Text style={[styles.typeSwitcherLabel, { color: bulkForm.health === 'bad' ? '#DC2626' : COLORS.textMuted }]}>Loše</Text>
+              <AppText style={[styles.typeSwitcherLabel, { color: bulkForm.health === 'bad' ? '#DC2626' : COLORS.textMuted }]}>Loše</AppText>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.typeSwitcherOption, bulkForm.health === 'warning' && styles.typeSwitcherOptionActive, bulkForm.health === 'warning' && { borderColor: '#D97706' }]}
               onPress={() => setBulkForm({ ...bulkForm, health: 'warning' as HiveHealth })}
             >
               <View style={[styles.legendSwatch, { borderColor: '#D97706', backgroundColor: '#FEF3C7' }]} />
-              <Text style={[styles.typeSwitcherLabel, { color: bulkForm.health === 'warning' ? '#D97706' : COLORS.textMuted }]}>Upozorenje</Text>
+              <AppText style={[styles.typeSwitcherLabel, { color: bulkForm.health === 'warning' ? '#D97706' : COLORS.textMuted }]}>Upozorenje</AppText>
             </TouchableOpacity>
           </View>
         )}
@@ -1649,7 +1649,7 @@ export default function HivesScreen() {
           <View style={[styles.bulkCheckbox, bulkForm.applyFeedingDate && styles.bulkCheckboxActive]}>
             {bulkForm.applyFeedingDate && <Ionicons name="checkmark" size={12} color={COLORS.surface} />}
           </View>
-          <Text style={styles.bulkToggleLabel}>Dodaj prihranu (košnice)</Text>
+          <AppText style={styles.bulkToggleLabel}>Dodaj prihranu (košnice)</AppText>
         </TouchableOpacity>
         {bulkForm.applyFeedingDate && (
           <DatePicker
@@ -1667,7 +1667,7 @@ export default function HivesScreen() {
           <View style={[styles.bulkCheckbox, bulkForm.applyHarvestDate && styles.bulkCheckboxActive]}>
             {bulkForm.applyHarvestDate && <Ionicons name="checkmark" size={12} color={COLORS.surface} />}
           </View>
-          <Text style={styles.bulkToggleLabel}>Dodaj vrcanje (košnice)</Text>
+          <AppText style={styles.bulkToggleLabel}>Dodaj vrcanje (košnice)</AppText>
         </TouchableOpacity>
         {bulkForm.applyHarvestDate && (
           <DatePicker
@@ -1685,7 +1685,7 @@ export default function HivesScreen() {
           <View style={[styles.bulkCheckbox, bulkForm.applyNote && styles.bulkCheckboxActive]}>
             {bulkForm.applyNote && <Ionicons name="checkmark" size={12} color={COLORS.surface} />}
           </View>
-          <Text style={styles.bulkToggleLabel}>Dodaj bilješku</Text>
+          <AppText style={styles.bulkToggleLabel}>Dodaj bilješku</AppText>
         </TouchableOpacity>
         {bulkForm.applyNote && (
           <Input
@@ -1767,13 +1767,13 @@ export default function HivesScreen() {
             }}
           >
             <Ionicons name="grid-outline" size={18} color={COLORS.textMuted} />
-            <Text style={[styles.typeSwitcherLabel, { color: COLORS.textMuted }]}>Košnica</Text>
+            <AppText style={[styles.typeSwitcherLabel, { color: COLORS.textMuted }]}>Košnica</AppText>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.typeSwitcherOption, styles.typeSwitcherOptionActive, { borderColor: COLORS.accent.swarm }]}
           >
             <Ionicons name="cube-outline" size={18} color={COLORS.accent.swarm} />
-            <Text style={[styles.typeSwitcherLabel, { color: COLORS.accent.swarm }]}>Roj</Text>
+            <AppText style={[styles.typeSwitcherLabel, { color: COLORS.accent.swarm }]}>Roj</AppText>
           </TouchableOpacity>
         </View>
 
@@ -1813,7 +1813,7 @@ export default function HivesScreen() {
           />
 
           <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Aktivan</Text>
+            <AppText style={styles.switchLabel}>Aktivan</AppText>
             <TouchableOpacity
               style={[styles.switch, swarmFormData.isActive && styles.switchActive]}
               onPress={() =>
@@ -1865,7 +1865,7 @@ export default function HivesScreen() {
           }}
         >
           <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
-          <Text style={styles.deleteHiveButtonText}>Obriši roj</Text>
+          <AppText style={styles.deleteHiveButtonText}>Obriši roj</AppText>
         </TouchableOpacity>
       </Modal>
     </View>

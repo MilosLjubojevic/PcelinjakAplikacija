@@ -32,6 +32,7 @@ export const incomeCategoryOptions: PickerOption[] = [
   { label: "Prodaja matica", value: "queen-sale" },
   { label: "Prodaja košnica", value: "hive-sale" },
   { label: "Prodaja voska", value: "wax-sale" },
+  { label: "Prodaja polena", value: "pollen-sale" },
   { label: "Usluge oprašivanja", value: "pollination" },
   { label: "Ostalo", value: "other" },
 ];
@@ -42,6 +43,7 @@ export const incomeCategoryLabels: Record<IncomeCategory, string> = {
   "queen-sale": "Matice",
   "hive-sale": "Košnice",
   "wax-sale": "Vosak",
+  "pollen-sale": "Polen",
   pollination: "Oprašivanje",
   other: "Ostalo",
 };
@@ -60,6 +62,7 @@ export const categoryColors: Record<string, string> = {
   "queen-sale": COLORS.accent.swarm,
   "hive-sale": COLORS.primaryDark,
   "wax-sale": COLORS.accent.queen,
+  "pollen-sale": "#84CC16",
   pollination: COLORS.info,
   other: COLORS.textSecondary,
 };

@@ -1,5 +1,6 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import AppText from './AppText';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants/designTokens';
 
 interface ButtonProps {
@@ -54,7 +55,7 @@ export default function Button({
       {loading ? (
         <ActivityIndicator color={variantStyles.color} />
       ) : (
-        <Text style={[styles.text, { color: variantStyles.color }, textStyle]}>{title}</Text>
+        <AppText style={[styles.text, { color: variantStyles.color }, textStyle]}>{title}</AppText>
       )}
     </TouchableOpacity>
   );

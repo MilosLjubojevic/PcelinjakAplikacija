@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
+import AppText from '../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants/designTokens';
 
@@ -81,7 +82,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               ]}
             >
               <Ionicons name={getIcon(toast.type)} size={20} color={getColor(toast.type)} />
-              <Text style={styles.text} numberOfLines={2}>{toast.message}</Text>
+              <AppText style={styles.text} numberOfLines={2}>{toast.message}</AppText>
             </Animated.View>
           );
         })}

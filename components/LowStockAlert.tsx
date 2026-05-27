@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { ProductWithOptions } from '../types';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../constants/designTokens';
@@ -26,24 +27,24 @@ export default function LowStockAlert({ products, threshold = 5 }: LowStockAlert
     <View style={styles.container}>
       <View style={styles.header}>
         <Ionicons name="warning" size={20} color={COLORS.danger} />
-        <Text style={styles.title}>
+        <AppText style={styles.title}>
           Nizak nivo zaliha ({lowStockItems.length})
-        </Text>
+        </AppText>
       </View>
       {lowStockItems.slice(0, 5).map((item, index) => (
         <View key={`${item.productName}-${item.size}-${index}`} style={styles.item}>
-          <Text style={styles.itemName} numberOfLines={1}>
+          <AppText style={styles.itemName} numberOfLines={1}>
             {item.productName} - {item.size}
-          </Text>
-          <Text style={[styles.itemStock, item.stock === 0 && styles.outOfStock]}>
+          </AppText>
+          <AppText style={[styles.itemStock, item.stock === 0 && styles.outOfStock]}>
             {item.stock === 0 ? 'Nema' : `${item.stock} kom`}
-          </Text>
+          </AppText>
         </View>
       ))}
       {lowStockItems.length > 5 && (
-        <Text style={styles.moreText}>
+        <AppText style={styles.moreText}>
           + još {lowStockItems.length - 5} artikala
-        </Text>
+        </AppText>
       )}
     </View>
   );

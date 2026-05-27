@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
   Alert,
   useWindowDimensions,
 } from "react-native";
+import AppText from "../components/AppText";
 import { Ionicons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
 import { useApp } from "../context/AppContext";
@@ -39,8 +39,10 @@ const statusOptions: PickerOption[] = [
 export default function QueensScreen() {
   const { state, loading, addQueenBoxRow, updateQueenBoxRow, reorderQueenBoxRows, deleteQueenBoxRow, refreshData } = useApp();
   const { showToast } = useToast();
-  const [selectedLocationId, setSelectedLocationId] = useState(state.locations[0]?.id || "");
-  const [expandedRows, setExpandedRows] = useState<string[]>([]);
+  const [expandedLocations, setExpandedLocations] = useState<string[]>(
+    state.locations[0]?.id ? [state.locations[0].id] : []
+  );
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [addRowModalVisible, setAddRowModalVisible] = useState(false);
   const [editBoxModalVisible, setEditBoxModalVisible] = useState(false);
   const [editingBox, setEditingBox] = useState<QueenBox | null>(null);
@@ -65,13 +67,18 @@ export default function QueensScreen() {
     startDate: null as Date | null,
     notes: "",
   });
+  const [editModeRows, setEditModeRows] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isDraggingRows, setIsDraggingRows] = useState(false);
+  const [quickActionModalVisible, setQuickActionModalVisible] = useState(false);
+  const [quickActionBox, setQuickActionBox] = useState<QueenBox | null>(null);
+  const [quickActionRowId, setQuickActionRowId] = useState<string | null>(null);
+  const [quickActionNotes, setQuickActionNotes] = useState("");
 
   const { width: screenWidth } = useWindowDimensions();
 
   const queenBoxRows = useMemo(() => state.queenBoxRows || [], [state.queenBoxRows]);
-  const filteredRows = queenBoxRows.filter((row) => row.locationId === selectedLocationId);
 
-  // All used queen box numbers across all rows (for uniqueness validation)
   const usedBoxNumbers = useMemo(() => {
     const numbers = new Set<number>();
     for (const row of queenBoxRows) {
@@ -82,8 +89,7 @@ export default function QueensScreen() {
     return numbers;
   }, [queenBoxRows]);
 
-  // Responsive box sizing: fill available width evenly
-  const gridPadding = SPACING.lg + SPACING.md; // container margin + expanded content padding
+  const gridPadding = SPACING.lg + SPACING.md;
   const gridGap = SPACING.sm;
   const availableWidth = screenWidth - gridPadding * 2;
   const minBoxSize = 48;
@@ -91,18 +97,15 @@ export default function QueensScreen() {
   const columnsCount = Math.max(4, Math.floor((availableWidth + gridGap) / (minBoxSize + gridGap)));
   const boxSize = Math.min(maxBoxSize, Math.floor((availableWidth - (columnsCount - 1) * gridGap) / columnsCount));
 
-  // Build location picker options from state.locations
   const locationOptions: PickerOption[] = useMemo(
     () => state.locations.map((loc) => ({ label: loc.name, value: loc.id })),
     [state.locations]
   );
 
-  // Auto-mature boxes that have passed 25 days — runs once on mount only
   const autoMaturedRef = useRef(false);
   useEffect(() => {
     if (autoMaturedRef.current || loading) return;
     autoMaturedRef.current = true;
-
     const now = new Date();
     for (const row of queenBoxRows) {
       const maturedBoxes: QueenBox[] = [];
@@ -110,12 +113,10 @@ export default function QueensScreen() {
         if (box.status !== "developing" || !box.startDate) continue;
         const start = new Date(box.startDate);
         const elapsed = (now.getTime() - start.getTime()) / (24 * 60 * 60 * 1000);
-        if (elapsed >= 25) {
-          maturedBoxes.push(box);
-        }
+        if (elapsed >= 25) maturedBoxes.push(box);
       }
       if (maturedBoxes.length > 0) {
-        const maturedIds = new Set(maturedBoxes.map(m => m.id));
+        const maturedIds = new Set(maturedBoxes.map((m) => m.id));
         const updatedBoxes = row.queenBoxes.map((b) =>
           maturedIds.has(b.id) ? { ...b, status: "mature" as const, updatedAt: new Date() } : b
         );
@@ -125,29 +126,16 @@ export default function QueensScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
-  const resetForm = () => {
-    setFormData({
-      rowName: "",
-      capacity: "",
-      locationId: selectedLocationId,
-    });
-  };
+  const resetForm = () => setFormData({ rowName: "", capacity: "", locationId: state.locations[0]?.id || "" });
 
   const resetBoxForm = () => {
-    setBoxFormData({
-      health: "good",
-      status: "empty",
-      displayNumber: "",
-      startDate: null,
-      notes: "",
-    });
+    setBoxFormData({ health: "good", status: "empty", displayNumber: "", startDate: null, notes: "" });
     setEditingBox(null);
     setEditingRowId(null);
   };
 
   const openAddModal = () => {
     resetForm();
-    setFormData((prev) => ({ ...prev, locationId: selectedLocationId }));
     setAddRowModalVisible(true);
   };
 
@@ -165,21 +153,15 @@ export default function QueensScreen() {
   };
 
   const handleAddRow = async () => {
-    if (!formData.rowName || !formData.capacity) {
-      return;
-    }
-
+    if (!formData.rowName || !formData.capacity) return;
     const capacity = parseInt(formData.capacity);
     if (isNaN(capacity) || capacity < 1 || capacity > 200) {
       Alert.alert("Greška", "Unesite validan kapacitet (1-200).");
       return;
     }
     setSaving(true);
-
     const now = new Date();
     const newRowId = Crypto.randomUUID();
-
-    // Create empty row with capacity — no pre-created boxes
     const newRow: QueenBoxRow = {
       id: newRowId,
       name: formData.rowName,
@@ -190,15 +172,14 @@ export default function QueensScreen() {
       createdAt: now,
       updatedAt: now,
     };
-
     await addQueenBoxRow(newRow);
     setSaving(false);
-    setExpandedRows([newRowId]);
+    setExpandedLocations((prev) => prev.includes(formData.locationId) ? prev : [...prev, formData.locationId]);
+    setExpandedRow(newRowId);
     setAddRowModalVisible(false);
     resetForm();
   };
 
-  // Open number input modal for adding a queen box to an empty slot
   const handleEmptySlotPress = (rowId: string, slotNumber: number) => {
     setPendingSlotRowId(rowId);
     setPendingSlotNumber(slotNumber);
@@ -208,7 +189,6 @@ export default function QueensScreen() {
 
   const handleConfirmAddBox = async () => {
     if (!pendingSlotRowId || pendingSlotNumber === null || saving) return;
-
     const num = parseInt(newBoxNumber);
     if (isNaN(num) || num < 1 || num > 999) {
       Alert.alert("Greška", "Unesite broj od 1 do 999.");
@@ -218,16 +198,12 @@ export default function QueensScreen() {
       Alert.alert("Greška", `Oplodnjak broj ${num} već postoji.`);
       return;
     }
-
     const rowId = pendingSlotRowId;
     const row = queenBoxRows.find((r) => r.id === rowId);
     if (!row) return;
-
-    // Close modal and capture data before async work
     const boxesSnapshot = [...row.queenBoxes];
     setSaving(true);
     setAddBoxModalVisible(false);
-
     const now = new Date();
     const newBox: QueenBox = {
       id: Crypto.randomUUID(),
@@ -240,11 +216,7 @@ export default function QueensScreen() {
       createdAt: now,
       updatedAt: now,
     };
-
-    updateQueenBoxRow(rowId, {
-      queenBoxes: [...boxesSnapshot, newBox],
-    });
-
+    updateQueenBoxRow(rowId, { queenBoxes: [...boxesSnapshot, newBox] });
     showToast(`Oplodnjak ${num} dodan`);
     setSaving(false);
     setPendingSlotRowId(null);
@@ -254,31 +226,24 @@ export default function QueensScreen() {
 
   const handleSaveBox = async () => {
     if (!editingBox || !editingRowId) return;
-
     const row = queenBoxRows.find((r) => r.id === editingRowId);
     if (!row) return;
     setSaving(true);
-
     const startDate = boxFormData.startDate || undefined;
     const newNumber = parseInt(boxFormData.displayNumber);
-
     if (isNaN(newNumber) || newNumber < 1 || newNumber > 999) {
       Alert.alert("Greška", "Unesite broj od 1 do 999.");
       setSaving(false);
       return;
     }
-
     if (newNumber !== editingBox.number && usedBoxNumbers.has(newNumber)) {
       Alert.alert("Greška", `Oplodnjak broj ${newNumber} već postoji.`);
       setSaving(false);
       return;
     }
-
-    // Calculate maturity date (25 days from start)
     const maturityDate = startDate
       ? new Date(startDate.getTime() + 25 * 24 * 60 * 60 * 1000)
       : undefined;
-
     const updatedBox: QueenBox = {
       ...editingBox,
       number: newNumber,
@@ -289,12 +254,7 @@ export default function QueensScreen() {
       notes: boxFormData.notes || undefined,
       updatedAt: new Date(),
     };
-
-    // Update the box in the row
-    const updatedBoxes = row.queenBoxes.map((b) =>
-      b.id === editingBox.id ? updatedBox : b
-    );
-
+    const updatedBoxes = row.queenBoxes.map((b) => (b.id === editingBox.id ? updatedBox : b));
     await updateQueenBoxRow(editingRowId, { queenBoxes: updatedBoxes });
     setSaving(false);
     setEditBoxModalVisible(false);
@@ -327,11 +287,7 @@ export default function QueensScreen() {
       `Da li ste sigurni da želite da obrišete "${rowName}" i sve oplodnjake u njemu?`,
       [
         { text: "Otkaži", style: "cancel" },
-        {
-          text: "Obriši",
-          style: "destructive",
-          onPress: () => deleteQueenBoxRow(rowId),
-        },
+        { text: "Obriši", style: "destructive", onPress: () => deleteQueenBoxRow(rowId) },
       ]
     );
   };
@@ -339,7 +295,6 @@ export default function QueensScreen() {
   const handleRemoveSlot = (rowId: string, boxId: string, boxNumber: number) => {
     const row = queenBoxRows.find((r) => r.id === rowId);
     if (!row) return;
-
     Alert.alert(
       "Obriši Oplodnjak",
       `Da li ste sigurni da želite da obrišete oplodnjak ${boxNumber}?`,
@@ -370,7 +325,7 @@ export default function QueensScreen() {
     if (!row) return;
     const updatedBox: QueenBox = { ...quickActionBox, notes: quickActionNotes || undefined, updatedAt: new Date() };
     await updateQueenBoxRow(quickActionRowId, {
-      queenBoxes: row.queenBoxes.map((b) => b.id === quickActionBox.id ? updatedBox : b),
+      queenBoxes: row.queenBoxes.map((b) => (b.id === quickActionBox.id ? updatedBox : b)),
     });
     setQuickActionModalVisible(false);
     showToast(`Bilješka sačuvana za oplodnjak ${quickActionBox.number}`);
@@ -389,7 +344,7 @@ export default function QueensScreen() {
       updatedAt: now,
     };
     await updateQueenBoxRow(quickActionRowId, {
-      queenBoxes: row.queenBoxes.map((b) => b.id === quickActionBox.id ? updatedBox : b),
+      queenBoxes: row.queenBoxes.map((b) => (b.id === quickActionBox.id ? updatedBox : b)),
     });
     setQuickActionModalVisible(false);
     showToast(`Tajmer resetovan za oplodnjak ${quickActionBox.number}`);
@@ -402,10 +357,14 @@ export default function QueensScreen() {
     const newHealth: QueenBoxHealth = quickActionBox.health === "warning" ? "good" : "warning";
     const updatedBox: QueenBox = { ...quickActionBox, health: newHealth, updatedAt: new Date() };
     await updateQueenBoxRow(quickActionRowId, {
-      queenBoxes: row.queenBoxes.map((b) => b.id === quickActionBox.id ? updatedBox : b),
+      queenBoxes: row.queenBoxes.map((b) => (b.id === quickActionBox.id ? updatedBox : b)),
     });
     setQuickActionModalVisible(false);
-    showToast(newHealth === "warning" ? `Oplodnjak ${quickActionBox.number} označen kao Upitno` : `Oplodnjak ${quickActionBox.number} označen kao Dobro`);
+    showToast(
+      newHealth === "warning"
+        ? `Oplodnjak ${quickActionBox.number} označen kao Upitno`
+        : `Oplodnjak ${quickActionBox.number} označen kao Dobro`
+    );
   };
 
   const handleQuickDeleteBox = () => {
@@ -431,35 +390,23 @@ export default function QueensScreen() {
     );
   };
 
-  const toggleRow = (rowId: string) => {
-    setExpandedRows((prev) =>
-      prev.includes(rowId)
-        ? prev.filter((id) => id !== rowId)
-        : [...prev, rowId]
-    );
-  };
+  const toggleRow = (rowId: string) =>
+    setExpandedRow((prev) => (prev === rowId ? null : rowId));
 
   const getHealthColor = (health: QueenBoxHealth) => {
     switch (health) {
-      case "good":
-        return COLORS.primary;
-      case "warning":
-        return COLORS.accent.swarm;
-      default:
-        return COLORS.textMuted;
+      case "good": return COLORS.primary;
+      case "warning": return COLORS.accent.swarm;
+      default: return COLORS.textMuted;
     }
   };
 
   const getStatusColor = (status: QueenBoxStatus) => {
     switch (status) {
-      case "empty":
-        return COLORS.textMuted;
-      case "developing":
-        return COLORS.info;
-      case "mature":
-        return COLORS.success;
-      default:
-        return COLORS.textMuted;
+      case "empty": return COLORS.textMuted;
+      case "developing": return COLORS.info;
+      case "mature": return COLORS.success;
+      default: return COLORS.textMuted;
     }
   };
 
@@ -473,376 +420,284 @@ export default function QueensScreen() {
   };
 
   const getRowStats = (row: QueenBoxRow) => {
-    const empty = row.queenBoxes.filter((b) => b.status === "empty").length;
     const developing = row.queenBoxes.filter((b) => b.status === "developing").length;
     const mature = row.queenBoxes.filter((b) => b.status === "mature").length;
     const emptySlots = row.capacity - row.queenBoxes.length;
-    return { empty, developing, mature, total: row.capacity, filled: row.queenBoxes.length, emptySlots };
+    return { developing, mature, total: row.capacity, filled: row.queenBoxes.length, emptySlots };
   };
 
-  const getLocationStats = (locationId: string) => {
-    const rows = queenBoxRows.filter((r) => r.locationId === locationId);
-    const totalSlots = rows.reduce((sum, r) => sum + r.capacity, 0);
-    const totalFilled = rows.reduce((sum, r) => sum + r.queenBoxes.length, 0);
-    const developing = rows.reduce(
-      (sum, r) => sum + r.queenBoxes.filter((b) => b.status === "developing").length,
-      0
-    );
-    const mature = rows.reduce(
-      (sum, r) => sum + r.queenBoxes.filter((b) => b.status === "mature").length,
-      0
-    );
-    return { totalRows: rows.length, totalSlots, totalFilled, developing, mature };
-  };
+  const handleRowsReorder = useCallback(
+    async (reorderedRows: QueenBoxRow[]) => { await reorderQueenBoxRows(reorderedRows); },
+    [reorderQueenBoxRows]
+  );
 
-  const [editModeRows, setEditModeRows] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isDraggingRows, setIsDraggingRows] = useState(false);
-  const [quickActionModalVisible, setQuickActionModalVisible] = useState(false);
-  const [quickActionBox, setQuickActionBox] = useState<QueenBox | null>(null);
-  const [quickActionRowId, setQuickActionRowId] = useState<string | null>(null);
-  const [quickActionNotes, setQuickActionNotes] = useState("");
+  // Auto-expand the location + row containing a searched box number
+  useEffect(() => {
+    if (!searchQuery) return;
+    const num = parseInt(searchQuery);
+    const matchingLocationIds: string[] = [];
+    let firstMatchingRowId: string | null = null;
 
-  const handleRowsReorder = useCallback(async (reorderedRows: QueenBoxRow[]) => {
-    await reorderQueenBoxRows(reorderedRows);
-  }, [reorderQueenBoxRows]);
+    for (const location of state.locations) {
+      const locationRows = queenBoxRows.filter((r) => r.locationId === location.id);
+      const matchingRows = locationRows.filter(
+        (row) =>
+          row.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (!isNaN(num) && row.queenBoxes.some((b) => b.number === num))
+      );
+      if (matchingRows.length > 0) {
+        matchingLocationIds.push(location.id);
+        if (!isNaN(num) && firstMatchingRowId === null) {
+          const rowWithBox = matchingRows.find((r) => r.queenBoxes.some((b) => b.number === num));
+          if (rowWithBox) firstMatchingRowId = rowWithBox.id;
+        }
+      }
+    }
+
+    setExpandedLocations(matchingLocationIds);
+    if (firstMatchingRowId) setExpandedRow(firstMatchingRowId);
+  }, [searchQuery, queenBoxRows, state.locations]);
 
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <GridSkeleton rows={3} cols={5} />
-      </View>
-    );
+    return <View style={styles.container}><GridSkeleton rows={3} cols={5} /></View>;
   }
 
-  const selectedLocation = state.locations.find((l) => l.id === selectedLocationId);
-
-  // Filter rows by search query
-  const searchedRows = searchQuery
-    ? filteredRows.filter(row =>
-        row.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        row.queenBoxes.some(b => b.number === parseInt(searchQuery))
-      )
-    : filteredRows;
+  const totalDeveloping = queenBoxRows.reduce((t, r) => t + r.queenBoxes.filter((b) => b.status === "developing").length, 0);
+  const totalMature = queenBoxRows.reduce((t, r) => t + r.queenBoxes.filter((b) => b.status === "mature").length, 0);
+  const totalBoxes = queenBoxRows.reduce((t, r) => t + r.queenBoxes.length, 0);
 
   return (
     <View style={styles.container}>
-      {/* Header with Refresh */}
-      <View style={styles.headerRow}>
-        <View style={{ flex: 1 }} />
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={refreshData}
-          disabled={loading}
-          accessibilityLabel="Osviježi podatke"
-        >
-          <Ionicons name="refresh" size={20} color={COLORS.primary} />
+      {/* Page Header */}
+      <View style={styles.pageHeader}>
+        <View>
+          <AppText style={styles.pageTitle}>Matice i oplodnjaci</AppText>
+          <AppText style={styles.pageSubtitle}>Pregled vaših oplodnjaka</AppText>
+        </View>
+        <TouchableOpacity style={styles.refreshBtn} onPress={refreshData} disabled={loading} accessibilityLabel="Osviježi">
+          <Ionicons name="refresh" size={18} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 
-      {/* Location Selector — dynamic from state.locations */}
-      <View style={styles.locationSelector}>
-        {state.locations.map((loc) => {
-          const isActive = loc.id === selectedLocationId;
-          const stats = getLocationStats(loc.id);
-          return (
-            <TouchableOpacity
-              key={loc.id}
-              style={[
-                styles.locationButton,
-                isActive && styles.locationButtonActive,
-              ]}
-              onPress={() => setSelectedLocationId(loc.id)}
-            >
-              <Ionicons
-                name={loc.name.toLowerCase().includes("kuc") ? "home" : "leaf"}
-                size={24}
-                color={isActive ? COLORS.surface : COLORS.textPrimary}
-              />
-              <View style={styles.locationInfo}>
-                <Text
-                  style={[
-                    styles.locationName,
-                    isActive && styles.locationNameActive,
-                  ]}
-                >
-                  {loc.name}
-                </Text>
-                <Text
-                  style={[
-                    styles.locationStats,
-                    isActive && styles.locationStatsActive,
-                  ]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
-                >
-                  {stats.totalRows} redova • {stats.totalFilled}/{stats.totalSlots} oplodnjaka
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Summary Stats */}
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryCard}>
-          <Ionicons name="cube-outline" size={24} color={COLORS.info} />
-          <Text style={styles.summaryNumber}>
-            {filteredRows.reduce(
-              (sum, row) => sum + row.queenBoxes.filter((b) => b.status === "developing").length,
-              0
-            )}
-          </Text>
-          <Text style={styles.summaryLabel}>U razvoju</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Ionicons name="checkmark-circle-outline" size={24} color={COLORS.success} />
-          <Text style={styles.summaryNumber}>
-            {filteredRows.reduce(
-              (sum, row) => sum + row.queenBoxes.filter((b) => b.status === "mature").length,
-              0
-            )}
-          </Text>
-          <Text style={styles.summaryLabel}>Zrele</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Ionicons name="grid-outline" size={24} color={COLORS.textPrimary} />
-          <Text style={styles.summaryNumber}>
-            {filteredRows.reduce((sum, row) => sum + row.queenBoxes.length, 0)}
-          </Text>
-          <Text style={styles.summaryLabel}>Ukupno</Text>
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        <AppText style={styles.statsText}>
+          Ukupno: <AppText style={styles.statsCount}>{totalBoxes}</AppText> oplodnjaka
+        </AppText>
+        <View style={styles.quickStatDots}>
+          <View style={styles.statPill}>
+            <Ionicons name="time-outline" size={12} color={COLORS.info} />
+            <AppText style={styles.statPillText} maxFontSizeMultiplier={1}>{totalDeveloping}</AppText>
+          </View>
+          <View style={styles.statPill}>
+            <Ionicons name="checkmark-circle-outline" size={12} color={COLORS.success} />
+            <AppText style={styles.statPillText} maxFontSizeMultiplier={1}>{totalMature}</AppText>
+          </View>
         </View>
       </View>
 
       <SearchBar value={searchQuery} onChangeText={setSearchQuery} placeholder="Pretraži redove/oplodnjake..." />
 
-      {/* Color Legend */}
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendSwatch, { borderColor: COLORS.primary }]} />
-          <Text style={styles.legendLabel}>U razvoju</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendSwatch, { borderColor: COLORS.success, backgroundColor: COLORS.successLight }]} />
-          <Text style={styles.legendLabel}>Zrela</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendSwatch, { borderColor: COLORS.borderMedium, backgroundColor: COLORS.border, opacity: 0.7 }]} />
-          <Text style={styles.legendLabel}>Prazna</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendCounterSwatch]}>
-            <Text style={styles.legendCounterText}>15d</Text>
-          </View>
-          <Text style={styles.legendLabel}>Dani do zrelosti</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendSwatch, { borderColor: COLORS.accent.swarm, backgroundColor: COLORS.accent.swarmLight }]} />
-          <Text style={styles.legendLabel}>Upitno</Text>
-        </View>
+      {/* Legend */}
+      <View style={styles.legendWrap}>
+        <View style={styles.legendItem}><View style={[styles.legendSwatch, { borderColor: COLORS.primary }]} /><AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>U razvoju</AppText></View>
+        <View style={styles.legendItem}><View style={[styles.legendSwatch, { borderColor: COLORS.success, backgroundColor: COLORS.successLight }]} /><AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Zrela</AppText></View>
+        <View style={styles.legendItem}><View style={[styles.legendSwatch, { borderColor: COLORS.borderMedium, backgroundColor: COLORS.border, opacity: 0.7 }]} /><AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Prazna</AppText></View>
+        <View style={styles.legendItem}><View style={styles.legendCounterSwatch}><AppText style={styles.legendCounterText} maxFontSizeMultiplier={1}>15d</AppText></View><AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Dani do zrelosti</AppText></View>
+        <View style={styles.legendItem}><View style={[styles.legendSwatch, { borderColor: COLORS.accent.swarm, backgroundColor: COLORS.accent.swarmLight }]} /><AppText style={styles.legendLabel} maxFontSizeMultiplier={1} numberOfLines={1}>Upitno</AppText></View>
       </View>
 
+      {/* Locations Accordion */}
       <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false} scrollEnabled={!isDraggingRows}>
-        {searchedRows.length === 0 ? (
-          <EmptyState
-            icon="star-outline"
-            title={searchQuery ? "Nema rezultata" : "Nema redova"}
-            message={searchQuery ? "Pokušajte drugi pojam za pretragu" : `Dodajte prvi red oplodnjaka za lokaciju ${selectedLocation?.name || ""}`}
-            actionLabel={searchQuery ? undefined : "Dodaj Red"}
-            onAction={searchQuery ? undefined : openAddModal}
-          />
-        ) : (
-          <DraggableRowList
-            rows={searchedRows}
-            disabled={!!searchQuery}
-            onReorder={handleRowsReorder}
-            onDragStart={() => setIsDraggingRows(true)}
-            onDragEnd={() => setIsDraggingRows(false)}
-            renderRow={(row) => {
-            const isExpanded = expandedRows.includes(row.id);
-            const stats = getRowStats(row);
+        {state.locations.map((location) => {
+          const isExpanded = expandedLocations.includes(location.id);
+          const locationRows = queenBoxRows.filter((r) => r.locationId === location.id);
+          const searchedRows = searchQuery
+            ? locationRows.filter(
+                (row) =>
+                  row.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  row.queenBoxes.some((b) => b.number === parseInt(searchQuery))
+              )
+            : locationRows;
+          const locFilled = locationRows.reduce((s, r) => s + r.queenBoxes.length, 0);
 
-            return (
-              <View style={styles.rowContainer}>
-                {/* Row Header */}
-                <TouchableOpacity
-                  style={styles.rowHeader}
-                  onPress={() => toggleRow(row.id)}
-                >
-                  <View style={styles.rowHeaderLeft}>
-                    <Ionicons
-                      name={isExpanded ? "chevron-down" : "chevron-forward"}
-                      size={24}
-                      color={COLORS.textPrimary}
+          // Hide this location entirely if search is active and nothing matches here
+          if (searchQuery && searchedRows.length === 0) return null;
+
+          return (
+            <View key={location.id} style={styles.locationCard}>
+              {/* Location Header */}
+              <TouchableOpacity
+                style={styles.locationHeader}
+                onPress={() => {
+                  const isClosing = expandedLocations.includes(location.id);
+                  setExpandedLocations((prev) =>
+                    isClosing ? prev.filter((id) => id !== location.id) : [...prev, location.id]
+                  );
+                  if (isClosing) {
+                    const rowBelongsHere = locationRows.some((r) => r.id === expandedRow);
+                    if (rowBelongsHere) setExpandedRow(null);
+                  }
+                }}
+              >
+                <View style={[styles.locationIconBg, isExpanded && styles.locationIconBgActive]}>
+                  <Ionicons name={location.icon as any} size={20} color={isExpanded ? COLORS.surface : COLORS.primary} />
+                </View>
+                <View style={styles.locationInfo}>
+                  <AppText style={styles.locationName}>{location.name}</AppText>
+                  <AppText style={styles.locationMeta}>{locationRows.length} Redova  •  {locFilled} Oplodnjaka</AppText>
+                </View>
+                <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+
+              {/* Location Body */}
+              {isExpanded && (
+                <View style={styles.locationBody}>
+                  {searchedRows.length === 0 ? (
+                    <EmptyState
+                      icon="star-outline"
+                      title={searchQuery ? "Nema rezultata" : "Nema redova"}
+                      message={searchQuery ? "Pokušajte drugi pojam za pretragu" : "Dodajte prvi red oplodnjaka"}
+                      actionLabel={searchQuery ? undefined : "Dodaj Red"}
+                      onAction={searchQuery ? undefined : openAddModal}
                     />
-                    <Text style={styles.rowName}>{row.name}</Text>
-                    <View style={styles.rowBadge}>
-                      <Text style={styles.rowBadgeText} allowFontScaling={false}>{stats.filled}/{stats.total}</Text>
-                    </View>
-                  </View>
-
-                  {/* Quick Stats */}
-                  <View style={styles.quickStats}>
-                    <View style={styles.statDot}>
-                      <View style={[styles.dot, { backgroundColor: COLORS.borderMedium }]} />
-                      <Text style={styles.statNumber} allowFontScaling={false}>{stats.emptySlots}</Text>
-                    </View>
-                    <View style={styles.statDot}>
-                      <View style={[styles.dot, { backgroundColor: COLORS.info }]} />
-                      <Text style={styles.statNumber} allowFontScaling={false}>{stats.developing}</Text>
-                    </View>
-                    <View style={styles.statDot}>
-                      <View style={[styles.dot, { backgroundColor: COLORS.success }]} />
-                      <Text style={styles.statNumber} allowFontScaling={false}>{stats.mature}</Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-
-                {/* Slot Grid (shown when expanded) */}
-                {isExpanded && (
-                  <View style={styles.expandedContent}>
-                    <View style={styles.boxesGrid}>
-                      {/* Existing queen boxes (unordered — numbers are random) */}
-                      {row.queenBoxes.map((box) => {
-                        const daysUntilMature = calculateDaysUntilMature(box);
+                  ) : (
+                    <DraggableRowList
+                      rows={searchedRows}
+                      disabled={!!searchQuery}
+                      onReorder={handleRowsReorder}
+                      onDragStart={() => setIsDraggingRows(true)}
+                      onDragEnd={() => setIsDraggingRows(false)}
+                      renderRow={(row) => {
+                        const isRowExpanded = expandedRow === row.id;
+                        const stats = getRowStats(row);
 
                         return (
-                          <TouchableOpacity
-                            key={box.id}
-                            style={[
-                              styles.queenBox,
-                              { width: boxSize, height: boxSize, borderRadius: boxSize * 0.18 },
-                              { borderColor: box.status === "mature" ? COLORS.success : getHealthColor(box.health) },
-                              box.status === "empty" && styles.queenBoxEmpty,
-                              box.status === "mature" && styles.queenBoxMature,
-                              box.health === "warning" && box.status !== "mature" && styles.queenBoxUpitno,
-                              editModeRows.includes(row.id) && styles.queenBoxEditMode,
-                            ]}
-                            onPress={() =>
-                              editModeRows.includes(row.id)
-                                ? openEditBoxModal(box, row.id)
-                                : handleOpenQuickActionModal(row.id, box)
-                            }
-                            onLongPress={() => openEditBoxModal(box, row.id)}
-                            accessibilityLabel={`Oplodnjak ${box.number}, ${box.status === 'empty' ? 'prazan' : box.status === 'developing' ? 'u razvoju' : 'zreo'}`}
-                            accessibilityHint="Pritisni za promjenu statusa, dugo drži za izmjenu"
-                          >
-                            <Text style={styles.boxNumber} allowFontScaling={false}>{box.number}</Text>
+                          <View style={styles.rowContainer}>
+                            {/* Row Header */}
+                            <TouchableOpacity style={styles.rowHeader} onPress={() => toggleRow(row.id)}>
+                              <Ionicons name={isRowExpanded ? "chevron-down" : "chevron-forward"} size={14} color={COLORS.textMuted} />
+                              <AppText style={styles.rowLabel} numberOfLines={1}>{row.name.toUpperCase()}</AppText>
+                              <View style={styles.rowHeaderRight}>
+                                <View style={styles.rowStatDots}>
+                                  <View style={[styles.rowDot, { backgroundColor: COLORS.borderMedium }]} />
+                                  <AppText style={styles.rowDotText}>{stats.emptySlots}</AppText>
+                                  <View style={[styles.rowDot, { backgroundColor: COLORS.info }]} />
+                                  <AppText style={styles.rowDotText}>{stats.developing}</AppText>
+                                  <View style={[styles.rowDot, { backgroundColor: COLORS.success }]} />
+                                  <AppText style={styles.rowDotText}>{stats.mature}</AppText>
+                                </View>
+                                <View style={styles.rowCountBadge}>
+                                  <AppText style={styles.rowCountText} maxFontSizeMultiplier={1} numberOfLines={1}>{stats.filled}/{stats.total}</AppText>
+                                </View>
+                              </View>
+                            </TouchableOpacity>
 
-                            {/* Status indicator with icon */}
-                            <View
-                              style={[
-                                styles.statusIndicator,
-                                { backgroundColor: getStatusColor(box.status) },
-                              ]}
-                            >
-                              {box.status === "developing" && (
-                                <Ionicons name="time" size={8} color={COLORS.surface} />
-                              )}
-                              {box.status === "mature" && (
-                                <Ionicons name="checkmark" size={8} color={COLORS.surface} />
-                              )}
-                            </View>
+                            {isRowExpanded && (
+                              <View style={styles.rowContent}>
+                                {/* Box Grid */}
+                                <View style={styles.boxesGrid}>
+                                  {row.queenBoxes.map((box) => {
+                                    const daysUntilMature = calculateDaysUntilMature(box);
+                                    const searchNum = parseInt(searchQuery);
+                                    const isSearchMatch = searchQuery !== "" && !isNaN(searchNum) && box.number === searchNum;
+                                    return (
+                                      <TouchableOpacity
+                                        key={box.id}
+                                        style={[
+                                          styles.queenBox,
+                                          { width: boxSize, height: boxSize, borderRadius: boxSize * 0.18 },
+                                          { borderColor: box.status === "mature" ? COLORS.success : getHealthColor(box.health) },
+                                          box.status === "empty" && styles.queenBoxEmpty,
+                                          box.status === "mature" && styles.queenBoxMature,
+                                          box.health === "warning" && box.status !== "mature" && styles.queenBoxUpitno,
+                                          editModeRows.includes(row.id) && styles.queenBoxEditMode,
+                                          isSearchMatch && styles.queenBoxSearchMatch,
+                                        ]}
+                                        onPress={() =>
+                                          editModeRows.includes(row.id)
+                                            ? openEditBoxModal(box, row.id)
+                                            : handleOpenQuickActionModal(row.id, box)
+                                        }
+                                        onLongPress={() => openEditBoxModal(box, row.id)}
+                                        accessibilityLabel={`Oplodnjak ${box.number}, ${box.status === "empty" ? "prazan" : box.status === "developing" ? "u razvoju" : "zreo"}`}
+                                        accessibilityHint="Pritisni za promjenu statusa, dugo drži za izmjenu"
+                                      >
+                                        <AppText style={[styles.boxNumber, isSearchMatch && { color: COLORS.surface }]} allowFontScaling={false}>{box.number}</AppText>
+                                        <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(box.status) }]}>
+                                          {box.status === "developing" && <Ionicons name="time" size={8} color={COLORS.surface} />}
+                                          {box.status === "mature" && <Ionicons name="checkmark" size={8} color={COLORS.surface} />}
+                                        </View>
+                                        {daysUntilMature !== null && (
+                                          <View style={styles.daysCounter}>
+                                            <AppText style={styles.daysText} allowFontScaling={false}>{daysUntilMature}d</AppText>
+                                          </View>
+                                        )}
+                                        {box.status === "mature" && (
+                                          <Ionicons name="checkmark-circle" size={14} color={COLORS.success} style={styles.matureIcon} />
+                                        )}
+                                      </TouchableOpacity>
+                                    );
+                                  })}
+                                  {/* Empty add slots */}
+                                  {row.queenBoxes.length < row.capacity &&
+                                    Array.from({ length: row.capacity - row.queenBoxes.length }, (_, i) => (
+                                      <TouchableOpacity
+                                        key={`empty-${i}`}
+                                        style={[styles.queenBox, styles.emptySlot, { width: boxSize, height: boxSize, borderRadius: boxSize * 0.18 }]}
+                                        onPress={() => handleEmptySlotPress(row.id, i + 1)}
+                                        accessibilityLabel="Prazan slot"
+                                        accessibilityHint="Pritisni da dodaš oplodnjak"
+                                      >
+                                        <Ionicons name="add" size={10} color={COLORS.textMuted} />
+                                      </TouchableOpacity>
+                                    ))}
+                                </View>
 
-                            {/* Days counter */}
-                            {daysUntilMature !== null && (
-                              <View style={styles.daysCounter}>
-                                <Text style={styles.daysText} allowFontScaling={false}>{daysUntilMature}d</Text>
+                                {/* Row Actions */}
+                                <View style={styles.rowActions}>
+                                  <TouchableOpacity style={styles.rowActionBtn} onPress={() => handleOpenEditRow(row)}>
+                                    <Ionicons name="create-outline" size={16} color={COLORS.primary} />
+                                    <AppText style={[styles.rowActionText, { color: COLORS.primary }]}>Uredi red</AppText>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity
+                                    style={styles.rowActionBtn}
+                                    onPress={() =>
+                                      setEditModeRows((prev) =>
+                                        prev.includes(row.id) ? prev.filter((id) => id !== row.id) : [...prev, row.id]
+                                      )
+                                    }
+                                  >
+                                    <Ionicons
+                                      name={editModeRows.includes(row.id) ? "checkmark-circle-outline" : "pencil-outline"}
+                                      size={16}
+                                      color={editModeRows.includes(row.id) ? COLORS.success : COLORS.textMuted}
+                                    />
+                                    <AppText style={[styles.rowActionText, { color: editModeRows.includes(row.id) ? COLORS.success : COLORS.textMuted }]}>
+                                      {editModeRows.includes(row.id) ? "Gotovo" : "Izmjeni"}
+                                    </AppText>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity style={styles.rowActionBtn} onPress={() => handleDeleteRow(row.id, row.name)}>
+                                    <Ionicons name="trash-outline" size={16} color={COLORS.danger} />
+                                    <AppText style={[styles.rowActionText, { color: COLORS.danger }]}>Obriši red</AppText>
+                                  </TouchableOpacity>
+                                </View>
                               </View>
                             )}
-
-                            {/* Mature indicator */}
-                            {box.status === "mature" && (
-                              <Ionicons
-                                name="checkmark-circle"
-                                size={14}
-                                color={COLORS.success}
-                                style={styles.matureIcon}
-                              />
-                            )}
-                          </TouchableOpacity>
+                          </View>
                         );
-                      })}
-
-                      {/* Empty add slots for remaining capacity */}
-                      {row.queenBoxes.length < row.capacity &&
-                        Array.from({ length: row.capacity - row.queenBoxes.length }, (_, i) => (
-                          <TouchableOpacity
-                            key={`empty-${i}`}
-                            style={[
-                              styles.queenBox,
-                              styles.emptySlot,
-                              { width: boxSize, height: boxSize, borderRadius: boxSize * 0.18 },
-                            ]}
-                            onPress={() => handleEmptySlotPress(row.id, i + 1)}
-                            accessibilityLabel="Prazan slot"
-                            accessibilityHint="Pritisni da dodaš oplodnjak"
-                          >
-                            <Ionicons name="add" size={FONT_SIZE.lg} color={COLORS.textMuted} />
-                          </TouchableOpacity>
-                        ))
-                      }
-                    </View>
-
-                    {/* Row Actions */}
-                    <View style={styles.rowActions}>
-                      {editModeRows.includes(row.id) ? (
-                        <TouchableOpacity
-                          style={[styles.rowActionButton, styles.rowActionButtonSave]}
-                          onPress={() =>
-                            setEditModeRows((prev) => prev.filter((id) => id !== row.id))
-                          }
-                        >
-                          <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.surface} />
-                          <Text style={[styles.rowActionText, { color: COLORS.surface }]}>
-                            Sačuvaj
-                          </Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.rowActionButton}
-                          onPress={() =>
-                            setEditModeRows((prev) => [...prev, row.id])
-                          }
-                        >
-                          <Ionicons name="pencil-outline" size={20} color={COLORS.info} />
-                          <Text style={[styles.rowActionText, { color: COLORS.info }]}>
-                            Izmjeni
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                      <TouchableOpacity
-                        style={styles.rowActionButton}
-                        onPress={() => handleOpenEditRow(row)}
-                      >
-                        <Ionicons name="create-outline" size={20} color={COLORS.primary} />
-                        <Text style={[styles.rowActionText, { color: COLORS.primary }]}>
-                          Uredi red
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.rowActionButton}
-                        onPress={() => handleDeleteRow(row.id, row.name)}
-                      >
-                        <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
-                        <Text style={[styles.rowActionText, { color: COLORS.danger }]}>
-                          Obriši red
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-              </View>
-            );
-            }}
-          />
-        )}
+                      }}
+                    />
+                  )}
+                </View>
+              )}
+            </View>
+          );
+        })}
       </ScrollView>
 
-      {/* Add Button */}
-      <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
+      {/* FAB */}
+      <TouchableOpacity style={styles.fab} onPress={openAddModal}>
         <Ionicons name="add" size={28} color={COLORS.surface} />
       </TouchableOpacity>
 
@@ -858,41 +713,37 @@ export default function QueensScreen() {
               <Ionicons name="refresh-circle-outline" size={24} color={COLORS.info} />
             </View>
             <View style={styles.quickActionTextWrap}>
-              <Text style={styles.quickActionTitle}>Resetuj tajmer</Text>
-              <Text style={styles.quickActionDesc}>Počinje tajmer od 25 dana od danas</Text>
+              <AppText style={styles.quickActionTitle}>Resetuj tajmer</AppText>
+              <AppText style={styles.quickActionDesc}>Počinje tajmer od 25 dana od danas</AppText>
             </View>
             <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
           </TouchableOpacity>
-
           <TouchableOpacity style={styles.quickActionItem} onPress={handleToggleUpitno}>
             <View style={[styles.quickActionIcon, { backgroundColor: COLORS.accent.swarmLight }]}>
               <Ionicons name="help-circle-outline" size={24} color={COLORS.accent.swarm} />
             </View>
             <View style={styles.quickActionTextWrap}>
-              <Text style={styles.quickActionTitle}>
+              <AppText style={styles.quickActionTitle}>
                 {quickActionBox?.health === "warning" ? "Ukloni oznaku Upitno" : "Označi kao Upitno"}
-              </Text>
-              <Text style={styles.quickActionDesc}>
+              </AppText>
+              <AppText style={styles.quickActionDesc}>
                 {quickActionBox?.health === "warning" ? "Vrati status na Dobro" : "Označi oplodnjak kao upitan"}
-              </Text>
+              </AppText>
             </View>
             <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
           </TouchableOpacity>
-
           <TouchableOpacity style={[styles.quickActionItem, styles.quickActionItemDanger]} onPress={handleQuickDeleteBox}>
             <View style={[styles.quickActionIcon, { backgroundColor: COLORS.dangerLight }]}>
               <Ionicons name="trash-outline" size={24} color={COLORS.danger} />
             </View>
             <View style={styles.quickActionTextWrap}>
-              <Text style={[styles.quickActionTitle, { color: COLORS.danger }]}>Obriši oplodnjak</Text>
-              <Text style={styles.quickActionDesc}>Trajno ukloni ovaj oplodnjak</Text>
+              <AppText style={[styles.quickActionTitle, { color: COLORS.danger }]}>Obriši oplodnjak</AppText>
+              <AppText style={styles.quickActionDesc}>Trajno ukloni ovaj oplodnjak</AppText>
             </View>
             <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
           </TouchableOpacity>
         </View>
-
         <View style={styles.quickActionDivider} />
-
         <Input
           label="Bilješka"
           value={quickActionNotes}
@@ -901,303 +752,116 @@ export default function QueensScreen() {
           multiline
           numberOfLines={3}
         />
-
         <View style={styles.modalButtons}>
-          <Button
-            title="Zatvori"
-            onPress={() => setQuickActionModalVisible(false)}
-            variant="secondary"
-            style={{ flex: 1, marginRight: SPACING.sm }}
-          />
-          <Button
-            title="Sačuvaj bilješku"
-            onPress={handleSaveQuickNote}
-            style={{ flex: 1, marginLeft: SPACING.sm }}
-          />
+          <Button title="Zatvori" onPress={() => setQuickActionModalVisible(false)} variant="secondary" style={{ flex: 1, marginRight: SPACING.sm }} />
+          <Button title="Sačuvaj bilješku" onPress={handleSaveQuickNote} style={{ flex: 1, marginLeft: SPACING.sm }} />
         </View>
       </Modal>
 
       {/* Edit Row Modal */}
       <Modal
         visible={editRowModalVisible}
-        onClose={() => {
-          setEditRowModalVisible(false);
-          setEditingRow(null);
-        }}
+        onClose={() => { setEditRowModalVisible(false); setEditingRow(null); }}
         title="Uredi Red"
         hasUnsavedChanges={
           editingRow !== null &&
-          (editRowFormData.rowName !== editingRow.name ||
-            editRowFormData.capacity !== editingRow.capacity.toString())
+          (editRowFormData.rowName !== editingRow.name || editRowFormData.capacity !== editingRow.capacity.toString())
         }
       >
-        <Input
-          label="Naziv reda"
-          value={editRowFormData.rowName}
-          onChangeText={(text) => setEditRowFormData({ ...editRowFormData, rowName: text })}
-          placeholder="Npr. Red 1, Red A..."
-        />
-
-        <Input
-          label="Kapacitet (broj mjesta)"
-          value={editRowFormData.capacity}
-          onChangeText={(text) => setEditRowFormData({ ...editRowFormData, capacity: text })}
-          placeholder="Npr. 30"
-          keyboardType="numeric"
-        />
-
+        <Input label="Naziv reda" value={editRowFormData.rowName} onChangeText={(text) => setEditRowFormData({ ...editRowFormData, rowName: text })} placeholder="Npr. Red 1, Red A..." />
+        <Input label="Kapacitet (broj mjesta)" value={editRowFormData.capacity} onChangeText={(text) => setEditRowFormData({ ...editRowFormData, capacity: text })} placeholder="Npr. 30" keyboardType="numeric" />
         <View style={styles.modalButtons}>
-          <Button
-            title="Otkaži"
-            onPress={() => {
-              setEditRowModalVisible(false);
-              setEditingRow(null);
-            }}
-            variant="secondary"
-            style={{ flex: 1, marginRight: SPACING.sm }}
-          />
-          <Button
-            title="Sačuvaj"
-            onPress={handleSaveRow}
-            disabled={!editRowFormData.rowName || !editRowFormData.capacity}
-            loading={saving}
-            style={{ flex: 1, marginLeft: SPACING.sm }}
-          />
+          <Button title="Otkaži" onPress={() => { setEditRowModalVisible(false); setEditingRow(null); }} variant="secondary" style={{ flex: 1, marginRight: SPACING.sm }} />
+          <Button title="Sačuvaj" onPress={handleSaveRow} disabled={!editRowFormData.rowName || !editRowFormData.capacity} loading={saving} style={{ flex: 1, marginLeft: SPACING.sm }} />
         </View>
       </Modal>
 
       {/* Add Row Modal */}
       <Modal
         visible={addRowModalVisible}
-        onClose={() => {
-          setAddRowModalVisible(false);
-          resetForm();
-        }}
+        onClose={() => { setAddRowModalVisible(false); resetForm(); }}
         title="Dodaj Novi Red"
-        hasUnsavedChanges={formData.rowName !== '' || formData.capacity !== ''}
+        hasUnsavedChanges={formData.rowName !== "" || formData.capacity !== ""}
       >
-        <Input
-          label="Naziv reda"
-          value={formData.rowName}
-          onChangeText={(text) => setFormData({ ...formData, rowName: text })}
-          placeholder="Npr. Red 1, Red A..."
-        />
-
-        <Picker
-          label="Lokacija"
-          value={formData.locationId}
-          options={locationOptions}
-          onValueChange={(value) =>
-            setFormData({ ...formData, locationId: value as string })
-          }
-        />
-
-        <Input
-          label="Kapacitet (broj mjesta)"
-          value={formData.capacity}
-          onChangeText={(text) => setFormData({ ...formData, capacity: text })}
-          placeholder="Npr. 30"
-          keyboardType="numeric"
-        />
-
+        <Input label="Naziv reda" value={formData.rowName} onChangeText={(text) => setFormData({ ...formData, rowName: text })} placeholder="Npr. Red 1, Red A..." />
+        <Picker label="Lokacija" value={formData.locationId} options={locationOptions} onValueChange={(value) => setFormData({ ...formData, locationId: value as string })} />
+        <Input label="Kapacitet (broj mjesta)" value={formData.capacity} onChangeText={(text) => setFormData({ ...formData, capacity: text })} placeholder="Npr. 30" keyboardType="numeric" />
         <View style={styles.infoBox}>
           <Ionicons name="information-circle" size={20} color={COLORS.primary} />
-          <Text style={styles.infoText}>
-            Red će imati {formData.capacity ? parseInt(formData.capacity) || 0 : 0} praznih mjesta.
-            Dodajte oplodnjake pritiskom na prazne slotove.
-          </Text>
+          <AppText style={styles.infoText}>
+            Red će imati {formData.capacity ? parseInt(formData.capacity) || 0 : 0} praznih mjesta. Dodajte oplodnjake pritiskom na prazne slotove.
+          </AppText>
         </View>
-
         <View style={styles.modalButtons}>
-          <Button
-            title="Otkaži"
-            onPress={() => {
-              setAddRowModalVisible(false);
-              resetForm();
-            }}
-            variant="secondary"
-            style={{ flex: 1, marginRight: SPACING.sm }}
-          />
-          <Button
-            title="Dodaj Red"
-            onPress={handleAddRow}
-            disabled={!formData.rowName || !formData.capacity}
-            loading={saving}
-            style={{ flex: 1, marginLeft: SPACING.sm }}
-          />
+          <Button title="Otkaži" onPress={() => { setAddRowModalVisible(false); resetForm(); }} variant="secondary" style={{ flex: 1, marginRight: SPACING.sm }} />
+          <Button title="Dodaj Red" onPress={handleAddRow} disabled={!formData.rowName || !formData.capacity} loading={saving} style={{ flex: 1, marginLeft: SPACING.sm }} />
         </View>
       </Modal>
 
       {/* Add Box Number Modal */}
       <Modal
         visible={addBoxModalVisible}
-        onClose={() => {
-          setAddBoxModalVisible(false);
-          setPendingSlotRowId(null);
-          setPendingSlotNumber(null);
-          setNewBoxNumber("");
-        }}
+        onClose={() => { setAddBoxModalVisible(false); setPendingSlotRowId(null); setPendingSlotNumber(null); setNewBoxNumber(""); }}
         title="Dodaj Oplodnjak"
       >
-        <Input
-          label="Broj oplodnjaka (1-999)"
-          value={newBoxNumber}
-          onChangeText={setNewBoxNumber}
-          placeholder="Npr. 42"
-          keyboardType="numeric"
-        />
-
+        <Input label="Broj oplodnjaka (1-999)" value={newBoxNumber} onChangeText={setNewBoxNumber} placeholder="Npr. 42" keyboardType="numeric" />
         {newBoxNumber !== "" && usedBoxNumbers.has(parseInt(newBoxNumber)) && (
           <View style={styles.errorBox}>
             <Ionicons name="alert-circle" size={SPACING.xl} color={COLORS.danger} />
-            <Text style={styles.errorText}>
-              Oplodnjak broj {newBoxNumber} već postoji.
-            </Text>
+            <AppText style={styles.errorText}>Oplodnjak broj {newBoxNumber} već postoji.</AppText>
           </View>
         )}
-
         <View style={styles.infoBox}>
           <Ionicons name="information-circle" size={SPACING.xl} color={COLORS.primary} />
-          <Text style={styles.infoText}>
-            Tajmer od 25 dana će automatski početi.
-          </Text>
+          <AppText style={styles.infoText}>Tajmer od 25 dana će automatski početi.</AppText>
         </View>
-
         <View style={styles.modalButtons}>
-          <Button
-            title="Otkaži"
-            onPress={() => {
-              setAddBoxModalVisible(false);
-              setPendingSlotRowId(null);
-              setPendingSlotNumber(null);
-              setNewBoxNumber("");
-            }}
-            variant="secondary"
-            style={{ flex: 1, marginRight: SPACING.sm }}
-          />
-          <Button
-            title="Dodaj"
-            onPress={handleConfirmAddBox}
-            disabled={!newBoxNumber || usedBoxNumbers.has(parseInt(newBoxNumber)) || saving}
-            loading={saving}
-            style={{ flex: 1, marginLeft: SPACING.sm }}
-          />
+          <Button title="Otkaži" onPress={() => { setAddBoxModalVisible(false); setPendingSlotRowId(null); setPendingSlotNumber(null); setNewBoxNumber(""); }} variant="secondary" style={{ flex: 1, marginRight: SPACING.sm }} />
+          <Button title="Dodaj" onPress={handleConfirmAddBox} disabled={!newBoxNumber || usedBoxNumbers.has(parseInt(newBoxNumber)) || saving} loading={saving} style={{ flex: 1, marginLeft: SPACING.sm }} />
         </View>
       </Modal>
 
       {/* Edit Box Modal */}
       <Modal
         visible={editBoxModalVisible}
-        onClose={() => {
-          setEditBoxModalVisible(false);
-          resetBoxForm();
-        }}
+        onClose={() => { setEditBoxModalVisible(false); resetBoxForm(); }}
         title={`Oplodnjak ${editingBox?.number || ""}`}
-        hasUnsavedChanges={boxFormData.notes !== '' || boxFormData.startDate !== null}
+        hasUnsavedChanges={boxFormData.notes !== "" || boxFormData.startDate !== null}
       >
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Informacije</Text>
-
-          <Input
-            label="Broj oplodnjaka"
-            value={boxFormData.displayNumber}
-            onChangeText={(text) =>
-              setBoxFormData({ ...boxFormData, displayNumber: text })
-            }
-            placeholder="Npr. 125"
-            keyboardType="numeric"
-          />
-
-          <Picker
-            label="Status oplodnjaka"
-            value={boxFormData.status}
-            options={statusOptions}
-            onValueChange={(value) =>
-              setBoxFormData({ ...boxFormData, status: value as QueenBoxStatus })
-            }
-          />
-
-          <Picker
-            label="Zdravlje"
-            value={boxFormData.health}
-            options={healthOptions}
-            onValueChange={(value) =>
-              setBoxFormData({ ...boxFormData, health: value as QueenBoxHealth })
-            }
-          />
+          <AppText style={styles.sectionTitle}>Informacije</AppText>
+          <Input label="Broj oplodnjaka" value={boxFormData.displayNumber} onChangeText={(text) => setBoxFormData({ ...boxFormData, displayNumber: text })} placeholder="Npr. 125" keyboardType="numeric" />
+          <Picker label="Status oplodnjaka" value={boxFormData.status} options={statusOptions} onValueChange={(value) => setBoxFormData({ ...boxFormData, status: value as QueenBoxStatus })} />
+          <Picker label="Zdravlje" value={boxFormData.health} options={healthOptions} onValueChange={(value) => setBoxFormData({ ...boxFormData, health: value as QueenBoxHealth })} />
         </View>
-
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Datumi</Text>
-
-          <DatePicker
-            label="Datum početka (kada je matičnjak postavljen)"
-            value={boxFormData.startDate}
-            onChange={(date) =>
-              setBoxFormData({ ...boxFormData, startDate: date })
-            }
-            placeholder="Izaberite datum"
-          />
-
+          <AppText style={styles.sectionTitle}>Datumi</AppText>
+          <DatePicker label="Datum početka (kada je matičnjak postavljen)" value={boxFormData.startDate} onChange={(date) => setBoxFormData({ ...boxFormData, startDate: date })} placeholder="Izaberite datum" />
           {boxFormData.startDate && (
             <View style={styles.maturityInfo}>
               <Ionicons name="time-outline" size={18} color={COLORS.info} />
-              <Text style={styles.maturityText}>
+              <AppText style={styles.maturityText}>
                 Matica će biti zrela:{" "}
-                {formatDate(
-                  new Date(
-                    boxFormData.startDate.getTime() + 25 * 24 * 60 * 60 * 1000
-                  )
-                )}
-              </Text>
+                {formatDate(new Date(boxFormData.startDate.getTime() + 25 * 24 * 60 * 60 * 1000))}
+              </AppText>
             </View>
           )}
         </View>
-
         <View style={styles.sectionContainer}>
-          <Input
-            label="Bilješke (opciono)"
-            value={boxFormData.notes}
-            onChangeText={(text) =>
-              setBoxFormData({ ...boxFormData, notes: text })
-            }
-            placeholder="Dodatne informacije..."
-            multiline
-            numberOfLines={3}
-          />
+          <Input label="Bilješke (opciono)" value={boxFormData.notes} onChangeText={(text) => setBoxFormData({ ...boxFormData, notes: text })} placeholder="Dodatne informacije..." multiline numberOfLines={3} />
         </View>
-
-        {/* Delete box button */}
         {editingBox && editingRowId && (
           <TouchableOpacity
             style={styles.deleteBoxButton}
-            onPress={() => {
-              setEditBoxModalVisible(false);
-              resetBoxForm();
-              handleRemoveSlot(editingRowId, editingBox.id, editingBox.number);
-            }}
+            onPress={() => { setEditBoxModalVisible(false); resetBoxForm(); handleRemoveSlot(editingRowId, editingBox.id, editingBox.number); }}
           >
             <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
-            <Text style={styles.deleteBoxText}>Obriši oplodnjak</Text>
+            <AppText style={styles.deleteBoxText}>Obriši oplodnjak</AppText>
           </TouchableOpacity>
         )}
-
         <View style={styles.modalButtons}>
-          <Button
-            title="Otkaži"
-            onPress={() => {
-              setEditBoxModalVisible(false);
-              resetBoxForm();
-            }}
-            variant="secondary"
-            style={{ flex: 1, marginRight: SPACING.sm }}
-          />
-          <Button
-            title="Sačuvaj"
-            onPress={handleSaveBox}
-            loading={saving}
-            style={{ flex: 1, marginLeft: SPACING.sm }}
-          />
+          <Button title="Otkaži" onPress={() => { setEditBoxModalVisible(false); resetBoxForm(); }} variant="secondary" style={{ flex: 1, marginRight: SPACING.sm }} />
+          <Button title="Sačuvaj" onPress={handleSaveBox} loading={saving} style={{ flex: 1, marginLeft: SPACING.sm }} />
         </View>
       </Modal>
     </View>
@@ -1205,92 +869,64 @@ export default function QueensScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  headerRow: {
+  container: { flex: 1, backgroundColor: COLORS.background },
+
+  // ─── Page Header ──────────────────────────────────────────────────
+  pageHeader: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.sm,
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.sm,
   },
-  refreshButton: {
-    padding: SPACING.sm,
-    borderRadius: RADIUS.md,
+  pageTitle: { fontSize: FONT_SIZE.xl, fontWeight: "700", color: COLORS.textPrimary, letterSpacing: -0.3 },
+  pageSubtitle: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 2 },
+  refreshBtn: {
+    width: 36, height: 36, borderRadius: RADIUS.md,
     backgroundColor: COLORS.surface,
+    alignItems: "center", justifyContent: "center",
     ...SHADOW.sm,
   },
-  locationSelector: {
-    flexDirection: "row",
-    padding: SPACING.lg,
-    gap: SPACING.md,
-  },
-  locationButton: {
-    flex: 1,
+
+  // ─── Stats Row ────────────────────────────────────────────────────
+  statsRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.sm,
+  },
+  statsText: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted },
+  statsCount: { fontWeight: "700", color: COLORS.textPrimary },
+  quickStatDots: { flexDirection: "row", gap: SPACING.sm },
+  statPill: {
+    flexDirection: "row", alignItems: "center", gap: 4,
     backgroundColor: COLORS.surface,
-    padding: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    gap: SPACING.md,
-    borderWidth: 2,
-    borderColor: "transparent",
-    ...SHADOW.md,
+    paddingHorizontal: SPACING.sm, paddingVertical: 4,
+    borderRadius: RADIUS.full,
+    borderWidth: 1, borderColor: COLORS.borderMedium,
   },
-  locationButtonActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  locationInfo: {
-    flex: 1,
-  },
-  locationName: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.xs,
-  },
-  locationNameActive: {
-    color: COLORS.surface,
-  },
-  locationStats: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textSecondary,
-  },
-  locationStatsActive: {
-    color: COLORS.surface,
-    opacity: 0.9,
-  },
-  summaryContainer: {
+  statPillText: { fontSize: FONT_SIZE.xs, fontWeight: "600", color: COLORS.textSecondary },
+
+  // ─── Legend ───────────────────────────────────────────────────────
+  legendWrap: {
     flexDirection: "row",
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.lg,
+    flexWrap: "wrap",
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING.sm,
     gap: SPACING.sm,
+    rowGap: 6,
   },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    alignItems: "center",
-    ...SHADOW.md,
-  },
-  summaryNumber: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-    marginTop: SPACING.xs,
-  },
-  summaryLabel: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  rowContainer: {
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 4, marginRight: 2 },
+  legendSwatch: { width: 12, height: 12, borderRadius: 3, borderWidth: 2.5, backgroundColor: COLORS.background },
+  legendLabel: { fontSize: 11, color: COLORS.textMuted },
+  legendCounterSwatch: { backgroundColor: COLORS.info, paddingHorizontal: 4, paddingVertical: 1, borderRadius: SPACING.xs },
+  legendCounterText: { fontSize: 11, fontWeight: "bold", color: COLORS.surface },
+
+  // ─── Scroll + Location Cards ──────────────────────────────────────
+  scrollView: { flex: 1 },
+  locationCard: {
     marginHorizontal: SPACING.lg,
     marginBottom: SPACING.md,
     backgroundColor: COLORS.surface,
@@ -1298,62 +934,62 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     ...SHADOW.md,
   },
-  rowHeader: {
+  locationHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     padding: SPACING.lg,
-  },
-  rowHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-    flex: 1,
-  },
-  rowName: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-  },
-  rowBadge: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 10,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.md,
-  },
-  rowBadgeText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: "600",
-    color: COLORS.surface,
-  },
-  quickStats: {
-    flexDirection: "row",
     gap: SPACING.md,
   },
-  statDot: {
+  locationIconBg: {
+    width: 36, height: 36, borderRadius: RADIUS.md,
+    backgroundColor: COLORS.background,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1.5, borderColor: COLORS.borderMedium,
+  },
+  locationIconBgActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  locationInfo: { flex: 1 },
+  locationName: { fontSize: FONT_SIZE.md, fontWeight: "700", color: COLORS.textPrimary },
+  locationMeta: { fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 1 },
+  locationBody: { borderTopWidth: 1, borderTopColor: COLORS.borderMedium },
+
+  // ─── Rows ─────────────────────────────────────────────────────────
+  rowContainer: {
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderMedium,
+    overflow: "hidden",
+  },
+  rowHeader: {
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
     gap: SPACING.xs,
   },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  statNumber: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: "600",
+  rowLabel: {
+    flex: 1,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: "700",
     color: COLORS.textSecondary,
+    letterSpacing: 0.5,
   },
-  expandedContent: {
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.md,
+  rowHeaderRight: { flexDirection: "row", alignItems: "center", gap: SPACING.sm },
+  rowStatDots: { flexDirection: "row", alignItems: "center", gap: 4 },
+  rowDot: { width: 8, height: 8, borderRadius: 4 },
+  rowDotText: { fontSize: FONT_SIZE.xs, fontWeight: "600", color: COLORS.textMuted, marginRight: 2 },
+  rowCountBadge: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: RADIUS.full,
   },
-  boxesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: SPACING.sm,
-  },
+  rowCountText: { fontSize: FONT_SIZE.xs, fontWeight: "600", color: COLORS.surface },
+  rowContent: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.md },
+
+  // ─── Box Grid ─────────────────────────────────────────────────────
+  boxesGrid: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm, marginBottom: SPACING.sm },
   queenBox: {
     borderWidth: 3,
     borderStyle: "solid",
@@ -1362,13 +998,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
   },
-  queenBoxEmpty: {
-    backgroundColor: COLORS.border,
-    opacity: 0.7,
-  },
-  queenBoxMature: {
-    backgroundColor: COLORS.successLight,
-  },
+  queenBoxEmpty: { backgroundColor: COLORS.border, opacity: 0.7 },
+  queenBoxMature: { backgroundColor: COLORS.successLight },
   emptySlot: {
     borderWidth: 2,
     borderStyle: "dashed",
@@ -1376,112 +1007,71 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     opacity: 0.6,
   },
-  emptySlotNumber: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
-    fontWeight: "500",
-  },
-  boxNumber: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-  },
+  boxNumber: { fontSize: FONT_SIZE.md, fontWeight: "bold", color: COLORS.textPrimary },
   statusIndicator: {
-    position: "absolute",
-    top: 3,
-    right: 3,
-    width: SPACING.md,
-    height: SPACING.md,
+    position: "absolute", top: 3, right: 3,
+    width: SPACING.md, height: SPACING.md,
     borderRadius: 6,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center", justifyContent: "center",
   },
   daysCounter: {
-    position: "absolute",
-    bottom: 2,
-    left: 2,
+    position: "absolute", bottom: 2, left: 2,
     backgroundColor: COLORS.info,
-    paddingHorizontal: SPACING.xs,
-    paddingVertical: 1,
+    paddingHorizontal: SPACING.xs, paddingVertical: 1,
     borderRadius: SPACING.xs,
   },
-  daysText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: "bold",
-    color: COLORS.surface,
-  },
-  matureIcon: {
-    position: "absolute",
-    bottom: 2,
-    right: 2,
-  },
+  daysText: { fontSize: FONT_SIZE.xs, fontWeight: "bold", color: COLORS.surface },
+  matureIcon: { position: "absolute", bottom: 2, right: 2 },
+  queenBoxEditMode: { opacity: 0.85, borderStyle: "dashed" },
+  queenBoxUpitno: { backgroundColor: COLORS.accent.swarmLight },
+  queenBoxSearchMatch: { backgroundColor: "#FF1493", borderColor: "#FF1493" },
+
+  // ─── Row Actions ──────────────────────────────────────────────────
   rowActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginTop: SPACING.md,
-    paddingTop: SPACING.md,
+    paddingTop: SPACING.sm,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderMedium,
+    gap: SPACING.xs,
   },
-  rowActionButton: {
+  rowActionBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    padding: SPACING.sm,
+    gap: 4,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
   },
-  rowActionText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: "500",
-    color: COLORS.success,
-  },
-  addButton: {
+  rowActionText: { fontSize: FONT_SIZE.xs, fontWeight: "600" },
+
+  // ─── FAB ──────────────────────────────────────────────────────────
+  fab: {
     position: "absolute",
-    bottom: SPACING.xxl,
-    right: SPACING.xxl,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    bottom: SPACING.xxl, right: SPACING.xxl,
+    width: 60, height: 60, borderRadius: 30,
     backgroundColor: COLORS.primary,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center", justifyContent: "center",
     ...SHADOW.fab,
   },
+
+  // ─── Modals ───────────────────────────────────────────────────────
   infoBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
+    flexDirection: "row", alignItems: "center", gap: SPACING.sm,
     backgroundColor: COLORS.background,
-    padding: SPACING.md,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    padding: SPACING.md, borderRadius: RADIUS.sm,
+    borderWidth: 1, borderColor: COLORS.primary,
     marginBottom: SPACING.lg,
   },
   errorBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
+    flexDirection: "row", alignItems: "center", gap: SPACING.sm,
     backgroundColor: COLORS.background,
-    padding: SPACING.md,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.danger,
+    padding: SPACING.md, borderRadius: RADIUS.sm,
+    borderWidth: 1, borderColor: COLORS.danger,
     marginBottom: SPACING.lg,
   },
-  errorText: {
-    flex: 1,
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.danger,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSecondary,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    marginTop: SPACING.sm,
-  },
+  infoText: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.textSecondary },
+  errorText: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.danger },
+  modalButtons: { flexDirection: "row", marginTop: SPACING.sm },
   sectionContainer: {
     marginBottom: SPACING.xl,
     paddingBottom: SPACING.lg,
@@ -1489,132 +1079,33 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.borderMedium,
   },
   sectionTitle: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.lg,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    fontSize: FONT_SIZE.md, fontWeight: "bold", color: COLORS.textPrimary,
+    marginBottom: SPACING.lg, textTransform: "uppercase", letterSpacing: 0.5,
   },
   maturityInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
+    flexDirection: "row", alignItems: "center", gap: SPACING.sm,
     backgroundColor: COLORS.infoLight,
-    padding: 10,
-    borderRadius: RADIUS.sm,
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.md,
+    padding: 10, borderRadius: RADIUS.sm,
+    marginTop: SPACING.sm, marginBottom: SPACING.md,
   },
-  maturityText: {
-    flex: 1,
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.info,
-    fontWeight: "500",
-  },
+  maturityText: { flex: 1, fontSize: FONT_SIZE.sm, color: COLORS.info, fontWeight: "500" },
   deleteBoxButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: SPACING.sm,
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.danger,
-    borderRadius: RADIUS.md,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: SPACING.sm, padding: SPACING.md, marginBottom: SPACING.md,
+    borderWidth: 1, borderColor: COLORS.danger, borderRadius: RADIUS.md,
   },
-  deleteBoxText: {
-    fontSize: FONT_SIZE.md,
-    color: COLORS.danger,
-    fontWeight: "500",
-  },
-  queenBoxEditMode: {
-    opacity: 0.85,
-    borderStyle: "dashed",
-  },
-  queenBoxUpitno: {
-    backgroundColor: COLORS.accent.swarmLight,
-  },
-  quickActionList: {
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
-  },
+  deleteBoxText: { fontSize: FONT_SIZE.md, color: COLORS.danger, fontWeight: "500" },
+  quickActionList: { gap: SPACING.sm, marginBottom: SPACING.sm },
   quickActionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.md,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
+    flexDirection: "row", alignItems: "center", gap: SPACING.md,
+    padding: SPACING.md, borderRadius: RADIUS.md,
     backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: COLORS.borderMedium,
+    borderWidth: 1, borderColor: COLORS.borderMedium,
   },
-  quickActionItemDanger: {
-    borderColor: COLORS.dangerLight,
-  },
-  quickActionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickActionTextWrap: {
-    flex: 1,
-  },
-  quickActionTitle: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: "600",
-    color: COLORS.textPrimary,
-  },
-  quickActionDesc: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  quickActionDivider: {
-    height: 1,
-    backgroundColor: COLORS.borderMedium,
-    marginVertical: SPACING.md,
-  },
-  rowActionButtonSave: {
-    backgroundColor: COLORS.success,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.md,
-  },
-  legend: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.sm,
-    gap: SPACING.md,
-    rowGap: SPACING.xs,
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.xs,
-  },
-  legendSwatch: {
-    width: 13,
-    height: 13,
-    borderRadius: 3,
-    borderWidth: 2.5,
-    backgroundColor: COLORS.background,
-  },
-  legendLabel: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textSecondary,
-  },
-  legendCounterSwatch: {
-    backgroundColor: COLORS.info,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: SPACING.xs,
-  },
-  legendCounterText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: "bold",
-    color: COLORS.surface,
-  },
+  quickActionItemDanger: { borderColor: COLORS.dangerLight },
+  quickActionIcon: { width: 44, height: 44, borderRadius: RADIUS.md, alignItems: "center", justifyContent: "center" },
+  quickActionTextWrap: { flex: 1 },
+  quickActionTitle: { fontSize: FONT_SIZE.md, fontWeight: "600", color: COLORS.textPrimary },
+  quickActionDesc: { fontSize: FONT_SIZE.xs, color: COLORS.textSecondary, marginTop: 2 },
+  quickActionDivider: { height: 1, backgroundColor: COLORS.borderMedium, marginVertical: SPACING.md },
 });

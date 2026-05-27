@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   Platform,
   Modal,
 } from "react-native";
+import AppText from "./AppText";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
@@ -63,7 +63,7 @@ export default function DatePicker({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      <AppText style={styles.label}>{label}</AppText>
       <View style={styles.inputRow}>
         <TouchableOpacity style={styles.inputContainer} onPress={openPicker}>
           <Ionicons
@@ -72,9 +72,9 @@ export default function DatePicker({
             color="#8B6914"
             style={styles.icon}
           />
-          <Text style={[styles.inputText, !value && styles.placeholder]}>
+          <AppText style={[styles.inputText, !value && styles.placeholder]}>
             {value ? formatDate(value) : placeholder}
-          </Text>
+          </AppText>
         </TouchableOpacity>
         {value && (
           <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
@@ -94,11 +94,11 @@ export default function DatePicker({
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <TouchableOpacity onPress={closePicker}>
-                  <Text style={styles.modalCancel}>Otkaži</Text>
+                  <AppText style={styles.modalCancel}>Otkaži</AppText>
                 </TouchableOpacity>
-                <Text style={styles.modalTitle}>{label}</Text>
+                <AppText style={styles.modalTitle}>{label}</AppText>
                 <TouchableOpacity onPress={closePicker}>
-                  <Text style={styles.modalDone}>Gotovo</Text>
+                  <AppText style={styles.modalDone}>Gotovo</AppText>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
