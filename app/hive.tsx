@@ -145,7 +145,7 @@ export default function HivesScreen() {
         health: hive.health,
         swarmStatus: hive.swarmStatus || "empty",
         swarmStartDate: hive.swarmStartDate ? new Date(hive.swarmStartDate) : null,
-        notes: hive.notes?.[0]?.text || "",
+        notes: "",
         isActive: hive.isActive !== false,
       });
       setEditSwarmModalVisible(true);
@@ -193,6 +193,33 @@ export default function HivesScreen() {
       updateLocation(currentLocation.id, { rows: updatedRows });
       setEditingHive(updatedHive);
       setHiveFormData({ ...hiveFormData, newNote: "" });
+    }
+  };
+
+  const handleAddSwarmNote = () => {
+    if (!editingHive || !swarmFormData.notes.trim()) return;
+
+    const newNote: HiveNote = {
+      id: Crypto.randomUUID(),
+      text: swarmFormData.notes.trim(),
+      createdAt: new Date(),
+    };
+
+    const updatedHive: Hive = {
+      ...editingHive,
+      notes: [...(editingHive.notes || []), newNote],
+      updatedAt: new Date(),
+    };
+
+    if (currentLocation) {
+      const updatedRows = currentLocation.rows.map((row) => ({
+        ...row,
+        hives: row.hives.map((h) => (h.id === editingHive.id ? updatedHive : h)),
+      }));
+
+      updateLocation(currentLocation.id, { rows: updatedRows });
+      setEditingHive(updatedHive);
+      setSwarmFormData({ ...swarmFormData, notes: "" });
     }
   };
 
@@ -1824,13 +1851,51 @@ export default function HivesScreen() {
             </TouchableOpacity>
           </View>
 
-          <Input
-            label="Bilješka"
-            value={swarmFormData.notes}
-            onChangeText={(text) => setSwarmFormData({ ...swarmFormData, notes: text })}
-            placeholder="Dodaj bilješku..."
-            multiline
-          />
+        </View>
+
+        {/* Notes Section */}
+        <View style={styles.notesSection}>
+          <AppText style={styles.notesLabel}>Bilješke</AppText>
+
+          {/* Existing notes */}
+          {editingHive?.notes && editingHive.notes.length > 0 && (
+            <View style={styles.notesList}>
+              {editingHive.notes.map((note) => (
+                <View key={note.id} style={styles.noteItem}>
+                  <View style={styles.noteContent}>
+                    <AppText style={styles.noteText}>{note.text}</AppText>
+                    <AppText style={styles.noteDate}>
+                      {formatDate(note.createdAt)}
+                    </AppText>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteNote(note.id)}
+                    style={styles.deleteNoteButton}
+                  >
+                    <Ionicons name="trash-outline" size={SPACING.xl} color={COLORS.danger} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Add new note */}
+          <View style={styles.addNoteContainer}>
+            <Input
+              value={swarmFormData.notes}
+              onChangeText={(text) => setSwarmFormData({ ...swarmFormData, notes: text })}
+              placeholder="Dodaj novu bilješku..."
+              multiline
+              numberOfLines={3}
+              containerStyle={{ flex: 1, marginBottom: 0 }}
+            />
+            <Button
+              title="Dodaj"
+              onPress={handleAddSwarmNote}
+              disabled={!swarmFormData.notes.trim()}
+              style={styles.addNoteButton}
+            />
+          </View>
         </View>
 
         <View style={styles.modalButtons}>

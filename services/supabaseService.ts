@@ -227,13 +227,13 @@ async function syncHiveUpdate(userId: string, oldHive: Hive, newHive: Hive): Pro
     .eq('id', newHive.id);
   if (error) throw error;
 
-  // Swarms don't have notes, feeding dates, or harvest dates
-  if (newHive.type === 'swarm') return;
-
-  // Sync notes
+  // Sync notes (applies to both hives and swarms)
   const oldNotes = oldHive.notes || [];
   const newNotes = newHive.notes || [];
   await syncHiveNotes(userId, newHive.id, oldNotes, newNotes);
+
+  // Feeding dates and harvest dates only apply to hives, not swarms
+  if (newHive.type === 'swarm') return;
 
   // Sync feeding dates
   const oldFeedDates = oldHive.feedingDates || [];

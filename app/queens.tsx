@@ -74,6 +74,8 @@ export default function QueensScreen() {
   const [quickActionBox, setQuickActionBox] = useState<QueenBox | null>(null);
   const [quickActionRowId, setQuickActionRowId] = useState<string | null>(null);
   const [quickActionNotes, setQuickActionNotes] = useState("");
+  const [customTimerModalVisible, setCustomTimerModalVisible] = useState(false);
+  const [customTimerDays, setCustomTimerDays] = useState("");
 
   const { width: screenWidth } = useWindowDimensions();
 
@@ -110,10 +112,8 @@ export default function QueensScreen() {
     for (const row of queenBoxRows) {
       const maturedBoxes: QueenBox[] = [];
       for (const box of row.queenBoxes) {
-        if (box.status !== "developing" || !box.startDate) continue;
-        const start = new Date(box.startDate);
-        const elapsed = (now.getTime() - start.getTime()) / (24 * 60 * 60 * 1000);
-        if (elapsed >= 25) maturedBoxes.push(box);
+        if (box.status !== "developing" || !box.maturityDate) continue;
+        if (now >= new Date(box.maturityDate)) maturedBoxes.push(box);
       }
       if (maturedBoxes.length > 0) {
         const maturedIds = new Set(maturedBoxes.map((m) => m.id));
@@ -350,6 +350,32 @@ export default function QueensScreen() {
     showToast(`Tajmer resetovan za oplodnjak ${quickActionBox.number}`);
   };
 
+  const handleSetCustomTimer = async () => {
+    if (!quickActionBox || !quickActionRowId) return;
+    const days = parseInt(customTimerDays);
+    if (isNaN(days) || days < 1 || days > 365) {
+      Alert.alert("Greška", "Unesite broj dana od 1 do 365.");
+      return;
+    }
+    const row = queenBoxRows.find((r) => r.id === quickActionRowId);
+    if (!row) return;
+    const now = new Date();
+    const updatedBox: QueenBox = {
+      ...quickActionBox,
+      status: "developing",
+      startDate: now,
+      maturityDate: new Date(now.getTime() + days * 24 * 60 * 60 * 1000),
+      updatedAt: now,
+    };
+    await updateQueenBoxRow(quickActionRowId, {
+      queenBoxes: row.queenBoxes.map((b) => (b.id === quickActionBox.id ? updatedBox : b)),
+    });
+    setCustomTimerModalVisible(false);
+    setCustomTimerDays("");
+    setQuickActionModalVisible(false);
+    showToast(`Tajmer postavljen na ${days} dana za oplodnjak ${quickActionBox.number}`);
+  };
+
   const handleToggleUpitno = async () => {
     if (!quickActionBox || !quickActionRowId) return;
     const row = queenBoxRows.find((r) => r.id === quickActionRowId);
@@ -411,11 +437,9 @@ export default function QueensScreen() {
   };
 
   const calculateDaysUntilMature = (box: QueenBox): number | null => {
-    if (box.status !== "developing" || !box.startDate) return null;
-    const startDate = new Date(box.startDate);
-    const maturityDate = new Date(startDate.getTime() + 25 * 24 * 60 * 60 * 1000);
+    if (box.status !== "developing" || !box.maturityDate) return null;
     const today = new Date();
-    const daysLeft = Math.ceil((maturityDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+    const daysLeft = Math.ceil((new Date(box.maturityDate).getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
     return Math.max(0, daysLeft);
   };
 
@@ -718,6 +742,16 @@ export default function QueensScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionItem} onPress={() => { setCustomTimerDays(""); setCustomTimerModalVisible(true); }}>
+            <View style={[styles.quickActionIcon, { backgroundColor: COLORS.infoLight }]}>
+              <Ionicons name="timer-outline" size={24} color={COLORS.info} />
+            </View>
+            <View style={styles.quickActionTextWrap}>
+              <AppText style={styles.quickActionTitle}>Prilagođeni tajmer</AppText>
+              <AppText style={styles.quickActionDesc}>Postavi tajmer na željeni broj dana</AppText>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.quickActionItem} onPress={handleToggleUpitno}>
             <View style={[styles.quickActionIcon, { backgroundColor: COLORS.accent.swarmLight }]}>
               <Ionicons name="help-circle-outline" size={24} color={COLORS.accent.swarm} />
@@ -818,6 +852,38 @@ export default function QueensScreen() {
         <View style={styles.modalButtons}>
           <Button title="Otkaži" onPress={() => { setAddBoxModalVisible(false); setPendingSlotRowId(null); setPendingSlotNumber(null); setNewBoxNumber(""); }} variant="secondary" style={{ flex: 1, marginRight: SPACING.sm }} />
           <Button title="Dodaj" onPress={handleConfirmAddBox} disabled={!newBoxNumber || usedBoxNumbers.has(parseInt(newBoxNumber)) || saving} loading={saving} style={{ flex: 1, marginLeft: SPACING.sm }} />
+        </View>
+      </Modal>
+
+      {/* Custom Timer Modal */}
+      <Modal
+        visible={customTimerModalVisible}
+        onClose={() => { setCustomTimerModalVisible(false); setCustomTimerDays(""); }}
+        title="Prilagođeni tajmer"
+      >
+        <Input
+          label="Broj dana do zrelosti"
+          value={customTimerDays}
+          onChangeText={setCustomTimerDays}
+          placeholder="Npr. 21"
+          keyboardType="numeric"
+        />
+        <View style={styles.infoBox}>
+          <Ionicons name="information-circle" size={SPACING.xl} color={COLORS.primary} />
+          <AppText style={styles.infoText}>
+            {customTimerDays && !isNaN(parseInt(customTimerDays)) && parseInt(customTimerDays) > 0
+              ? `Matica će biti zrela za ${parseInt(customTimerDays)} dana od danas.`
+              : "Unesite broj dana od 1 do 365."}
+          </AppText>
+        </View>
+        <View style={styles.modalButtons}>
+          <Button title="Otkaži" onPress={() => { setCustomTimerModalVisible(false); setCustomTimerDays(""); }} variant="secondary" style={{ flex: 1, marginRight: SPACING.sm }} />
+          <Button
+            title="Postavi"
+            onPress={handleSetCustomTimer}
+            disabled={!customTimerDays || isNaN(parseInt(customTimerDays)) || parseInt(customTimerDays) < 1}
+            style={{ flex: 1, marginLeft: SPACING.sm }}
+          />
         </View>
       </Modal>
 
