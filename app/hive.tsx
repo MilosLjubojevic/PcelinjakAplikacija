@@ -65,6 +65,7 @@ export default function HivesScreen() {
     queenId: string;
     newNote: string;
     lastInspection: Date | null;
+    scheduledInspection: Date | null;
     frameCount: string;
     isHarvested: boolean;
     hasPollen: boolean;
@@ -78,6 +79,7 @@ export default function HivesScreen() {
     queenId: "",
     newNote: "",
     lastInspection: null,
+    scheduledInspection: null,
     frameCount: "10",
     isHarvested: false,
     hasPollen: false,
@@ -123,6 +125,7 @@ export default function HivesScreen() {
       queenId: "",
       newNote: "",
       lastInspection: null,
+      scheduledInspection: null,
       frameCount: "10",
       isHarvested: false,
       hasPollen: false,
@@ -157,6 +160,7 @@ export default function HivesScreen() {
         queenId: hive.queenId || "",
         newNote: "",
         lastInspection: hive.lastInspection ? new Date(hive.lastInspection) : null,
+        scheduledInspection: hive.scheduledInspection ? new Date(hive.scheduledInspection) : null,
         frameCount: hive.frameCount?.toString() || "10",
         isHarvested: hive.isHarvested || false,
         hasPollen: hive.hasPollen || false,
@@ -253,6 +257,7 @@ export default function HivesScreen() {
       hasQueen: hiveFormData.hasQueen,
       queenId: hiveFormData.queenId || undefined,
       lastInspection: hiveFormData.lastInspection || undefined,
+      scheduledInspection: hiveFormData.scheduledInspection || undefined,
       frameCount: parseInt(hiveFormData.frameCount) || 10,
       isHarvested: hiveFormData.isHarvested,
       hasPollen: hiveFormData.hasPollen,
@@ -1265,100 +1270,6 @@ export default function HivesScreen() {
           </View>
         </View>
 
-        {/* Produkcija Section */}
-        <View style={styles.sectionContainer}>
-          <AppText style={styles.sectionTitle}>Produkcija</AppText>
-
-          <View style={styles.switchRow}>
-            <AppText style={styles.switchLabel}>Vrcano</AppText>
-            <TouchableOpacity
-              style={[
-                styles.switch,
-                hiveFormData.isHarvested && styles.switchActive,
-              ]}
-              onPress={() =>
-                setHiveFormData({
-                  ...hiveFormData,
-                  isHarvested: !hiveFormData.isHarvested,
-                })
-              }
-            >
-              <View
-                style={[
-                  styles.switchThumb,
-                  hiveFormData.isHarvested && styles.switchThumbActive,
-                ]}
-              />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.switchRow}>
-            <AppText style={styles.switchLabel}>Polen</AppText>
-            <TouchableOpacity
-              style={[
-                styles.switch,
-                hiveFormData.hasPollen && styles.switchActive,
-              ]}
-              onPress={() =>
-                setHiveFormData({
-                  ...hiveFormData,
-                  hasPollen: !hiveFormData.hasPollen,
-                })
-              }
-            >
-              <View
-                style={[
-                  styles.switchThumb,
-                  hiveFormData.hasPollen && styles.switchThumbActive,
-                ]}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* Harvest Dates Section */}
-          <View style={styles.feedingSection}>
-            <AppText style={styles.feedingLabel}>
-              Vrcanja ({hiveFormData.harvestDates.length})
-            </AppText>
-            <DatePicker
-              label="Dodaj novo vrcanje"
-              value={null}
-              onChange={(date) => {
-                if (date) {
-                  setHiveFormData({
-                    ...hiveFormData,
-                    harvestDates: [...hiveFormData.harvestDates, date].sort(
-                      (a, b) => b.getTime() - a.getTime()
-                    ),
-                  });
-                }
-              }}
-            />
-            {hiveFormData.harvestDates.length > 0 && (
-              <View style={styles.feedingList}>
-                {hiveFormData.harvestDates.map((date, index) => (
-                  <View key={index} style={styles.feedingItem}>
-                    <AppText style={styles.feedingDate}>{formatDate(date)}</AppText>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setHiveFormData({
-                          ...hiveFormData,
-                          harvestDates: hiveFormData.harvestDates.filter(
-                            (_, i) => i !== index
-                          ),
-                        });
-                      }}
-                      style={styles.deleteFeedingButton}
-                    >
-                      <Ionicons name="close-circle" size={SPACING.xl} color={COLORS.danger} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        </View>
-
         {/* Održavanje Section */}
         <View style={styles.sectionContainer}>
           <AppText style={styles.sectionTitle}>Održavanje</AppText>
@@ -1412,6 +1323,28 @@ export default function HivesScreen() {
             onChange={(date) =>
               setHiveFormData({ ...hiveFormData, lastInspection: date })
             }
+          />
+          <View style={styles.scheduledRow}>
+            <View style={styles.scheduledInfo}>
+              <Ionicons name="calendar" size={16} color="#835500" />
+              <AppText style={styles.scheduledLabel}>Zakazana inspekcija</AppText>
+            </View>
+            {hiveFormData.scheduledInspection && (
+              <View style={styles.scheduledChip}>
+                <AppText style={styles.scheduledChipText}>
+                  {hiveFormData.scheduledInspection.toLocaleDateString("sr-Latn-BA", { day: "2-digit", month: "short", year: "numeric" })}
+                </AppText>
+                <TouchableOpacity onPress={() => setHiveFormData({ ...hiveFormData, scheduledInspection: null })}>
+                  <Ionicons name="close-circle" size={16} color="#835500" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+          <DatePicker
+            label="Zakaži inspekciju"
+            value={hiveFormData.scheduledInspection}
+            onChange={(date) => setHiveFormData({ ...hiveFormData, scheduledInspection: date })}
+            placeholder="Odaberi datum inspekcije..."
           />
         </View>
 
@@ -2288,6 +2221,15 @@ const styles = StyleSheet.create({
   deleteFeedingButton: {
     padding: SPACING.xs,
   },
+  scheduledRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: SPACING.sm },
+  scheduledInfo: { flexDirection: "row", alignItems: "center", gap: SPACING.xs },
+  scheduledLabel: { fontSize: FONT_SIZE.sm, fontWeight: "600", color: "#835500" },
+  scheduledChip: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "#FEF3C7", paddingHorizontal: SPACING.sm, paddingVertical: 4,
+    borderRadius: RADIUS.full, borderWidth: 1, borderColor: "#D97706",
+  },
+  scheduledChipText: { fontSize: FONT_SIZE.xs, fontWeight: "600", color: "#835500" },
   slotTypePickerContainer: {
     flexDirection: "row",
     gap: SPACING.md,
