@@ -11,6 +11,7 @@ import {
 import AppText from "../components/AppText";
 import Button from "../components/Button";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
+import ConfirmDiscardModal from "../components/ConfirmDiscardModal";
 import DatePicker from "../components/DatePicker";
 import Input from "../components/Input";
 import Modal from "../components/Modal";
@@ -28,6 +29,44 @@ const healthOptions: PickerOption[] = [
   { label: "Loše", value: "bad" },
 ];
 
+type HiveEditFormData = {
+  hiveNumber: string;
+  health: string;
+  hasQueen: boolean;
+  queenId: string;
+  newNote: string;
+  notes: HiveNote[];
+  lastInspection: Date | null;
+  scheduledInspection: Date | null;
+  frameCount: string;
+  isHarvested: boolean;
+  hasPollen: boolean;
+  feedingDates: Date[];
+  harvestDates: Date[];
+  isActive: boolean;
+  swarmStatus: SwarmStatus;
+  swarmStartDate: Date | null;
+};
+
+const EMPTY_HIVE_EDIT_FORM: HiveEditFormData = {
+  hiveNumber: "",
+  health: "good",
+  hasQueen: true,
+  queenId: "",
+  newNote: "",
+  notes: [],
+  lastInspection: null,
+  scheduledInspection: null,
+  frameCount: "10",
+  isHarvested: false,
+  hasPollen: false,
+  feedingDates: [],
+  harvestDates: [],
+  isActive: true,
+  swarmStatus: "empty",
+  swarmStartDate: null,
+};
+
 export default function HivesScreen() {
   const { state, loading, error, updateLocation, refreshData } = useApp();
   const [selectedLocation, setSelectedLocation] = useState(
@@ -44,13 +83,16 @@ export default function HivesScreen() {
   const [pendingSlotNumber, setPendingSlotNumber] = useState<number | null>(null);
   const [pendingSlotRowId, setPendingSlotRowId] = useState<string | null>(null);
   const [editSwarmModalVisible, setEditSwarmModalVisible] = useState(false);
-  const [swarmFormData, setSwarmFormData] = useState({
-    health: "good" as HiveHealth,
-    swarmStatus: "empty" as SwarmStatus,
-    swarmStartDate: null as Date | null,
-    notes: "",
-    isActive: true,
-  });
+  const [discardConfirmVisible, setDiscardConfirmVisible] = useState(false);
+  // Single shared form for both the hive and swarm modals — every field lives
+  // here regardless of which form is currently shown, so switching between
+  // hive/swarm never has to selectively decide what to carry over: nothing
+  // is ever dropped because there's only one object to begin with.
+  const [hiveEditForm, setHiveEditForm] = useState<HiveEditFormData>(EMPTY_HIVE_EDIT_FORM);
+  // Snapshot taken when the modal opens — compared against hiveEditForm to
+  // detect unsaved changes (including a pending type switch, notes, dates,
+  // everything) so we can warn before discarding them.
+  const [initialHiveEditForm, setInitialHiveEditForm] = useState<HiveEditFormData>(EMPTY_HIVE_EDIT_FORM);
   const [formData, setFormData] = useState({
     rowName: "",
     capacity: "",
@@ -58,35 +100,6 @@ export default function HivesScreen() {
   const [editRowModalVisible, setEditRowModalVisible] = useState(false);
   const [editingRow, setEditingRow] = useState<HiveRow | null>(null);
   const [editRowFormData, setEditRowFormData] = useState({ rowName: "", capacity: "" });
-  const [hiveFormData, setHiveFormData] = useState<{
-    hiveNumber: string;
-    health: string;
-    hasQueen: boolean;
-    queenId: string;
-    newNote: string;
-    lastInspection: Date | null;
-    scheduledInspection: Date | null;
-    frameCount: string;
-    isHarvested: boolean;
-    hasPollen: boolean;
-    feedingDates: Date[];
-    harvestDates: Date[];
-    isActive: boolean;
-  }>({
-    hiveNumber: "",
-    health: "good",
-    hasQueen: true,
-    queenId: "",
-    newNote: "",
-    lastInspection: null,
-    scheduledInspection: null,
-    frameCount: "10",
-    isHarvested: false,
-    hasPollen: false,
-    feedingDates: [],
-    harvestDates: [],
-    isActive: true,
-  });
 
   const { width: screenWidth } = useWindowDimensions();
 
@@ -107,33 +120,33 @@ export default function HivesScreen() {
     setFormData({ rowName: "", capacity: "" });
   };
 
-  const resetSwarmForm = () => {
-    setSwarmFormData({
-      health: "good",
-      swarmStatus: "empty",
-      swarmStartDate: null,
-      notes: "",
-      isActive: true,
-    });
+  const resetHiveEditForm = () => {
+    setHiveEditForm(EMPTY_HIVE_EDIT_FORM);
+    setInitialHiveEditForm(EMPTY_HIVE_EDIT_FORM);
+    setEditingHive(null);
   };
 
-  const resetHiveForm = () => {
-    setHiveFormData({
-      hiveNumber: "",
-      health: "good",
-      hasQueen: true,
-      queenId: "",
-      newNote: "",
-      lastInspection: null,
-      scheduledInspection: null,
-      frameCount: "10",
-      isHarvested: false,
-      hasPollen: false,
-      feedingDates: [],
-      harvestDates: [],
-      isActive: true,
-    });
-    setEditingHive(null);
+  // True if anything in the shared hive/swarm form differs from what was
+  // loaded when the modal opened — covers every field (including a pending
+  // type switch, staged notes, dates, etc.), not just the note input.
+  const isHiveEditFormDirty =
+    JSON.stringify(hiveEditForm) !== JSON.stringify(initialHiveEditForm);
+
+  const closeHiveEditModal = () => {
+    setEditHiveModalVisible(false);
+    setEditSwarmModalVisible(false);
+    resetHiveEditForm();
+  };
+
+  // Used by the "Otkaži" buttons, which close the modal directly and so
+  // bypass the Modal component's own hasUnsavedChanges gate on the X
+  // button/backdrop/back button — this keeps both paths consistent.
+  const requestCloseHiveEditModal = () => {
+    if (isHiveEditFormDirty) {
+      setDiscardConfirmVisible(true);
+    } else {
+      closeHiveEditModal();
+    }
   };
 
   const openAddModal = () => {
@@ -143,106 +156,53 @@ export default function HivesScreen() {
 
   const openEditHiveModal = (hive: Hive, rowId: string) => {
     setEditingHive(hive);
+    // Populate every field regardless of the hive's current type — hive-only
+    // fields default sensibly when opening a swarm and vice versa, so nothing
+    // is missing if the type gets switched inside the modal.
+    const form: HiveEditFormData = {
+      hiveNumber: hive.number.toString(),
+      health: hive.health,
+      hasQueen: hive.hasQueen ?? true,
+      queenId: hive.queenId || "",
+      newNote: "",
+      notes: hive.notes ? [...hive.notes] : [],
+      lastInspection: hive.lastInspection ? new Date(hive.lastInspection) : null,
+      scheduledInspection: hive.scheduledInspection ? new Date(hive.scheduledInspection) : null,
+      frameCount: hive.frameCount?.toString() || "10",
+      isHarvested: hive.isHarvested || false,
+      hasPollen: hive.hasPollen || false,
+      feedingDates: (hive.feedingDates || []).map((d) => new Date(d)),
+      harvestDates: (hive.harvestDates || []).map((d) => new Date(d)),
+      isActive: hive.isActive !== false,
+      swarmStatus: hive.swarmStatus || "empty",
+      swarmStartDate: hive.swarmStartDate ? new Date(hive.swarmStartDate) : null,
+    };
+    setHiveEditForm(form);
+    setInitialHiveEditForm(form);
     if (hive.type === 'swarm') {
-      setSwarmFormData({
-        health: hive.health,
-        swarmStatus: hive.swarmStatus || "empty",
-        swarmStartDate: hive.swarmStartDate ? new Date(hive.swarmStartDate) : null,
-        notes: "",
-        isActive: hive.isActive !== false,
-      });
       setEditSwarmModalVisible(true);
     } else {
-      setHiveFormData({
-        hiveNumber: hive.number.toString(),
-        health: hive.health,
-        hasQueen: hive.hasQueen ?? true,
-        queenId: hive.queenId || "",
-        newNote: "",
-        lastInspection: hive.lastInspection ? new Date(hive.lastInspection) : null,
-        scheduledInspection: hive.scheduledInspection ? new Date(hive.scheduledInspection) : null,
-        frameCount: hive.frameCount?.toString() || "10",
-        isHarvested: hive.isHarvested || false,
-        hasPollen: hive.hasPollen || false,
-        feedingDates: (hive.feedingDates || []).map((d) => new Date(d)),
-        harvestDates: (hive.harvestDates || []).map((d) => new Date(d)),
-        isActive: hive.isActive !== false,
-      });
       setEditHiveModalVisible(true);
     }
   };
 
+  // Notes are staged locally (hiveEditForm.notes) and only persisted to
+  // Supabase when the modal's "Sačuvaj" button is pressed — adding/removing
+  // a note here must never write to the DB directly.
   const handleAddNote = () => {
-    if (!editingHive || !hiveFormData.newNote.trim()) return;
+    if (!hiveEditForm.newNote.trim()) return;
 
     const newNote: HiveNote = {
       id: Crypto.randomUUID(),
-      text: hiveFormData.newNote.trim(),
+      text: hiveEditForm.newNote.trim(),
       createdAt: new Date(),
     };
 
-    const updatedHive: Hive = {
-      ...editingHive,
-      notes: [...(editingHive.notes || []), newNote],
-      updatedAt: new Date(),
-    };
-
-    // Update in location
-    if (currentLocation) {
-      const updatedRows = currentLocation.rows.map((row) => ({
-        ...row,
-        hives: row.hives.map((h) => (h.id === editingHive.id ? updatedHive : h)),
-      }));
-
-      updateLocation(currentLocation.id, { rows: updatedRows });
-      setEditingHive(updatedHive);
-      setHiveFormData({ ...hiveFormData, newNote: "" });
-    }
-  };
-
-  const handleAddSwarmNote = () => {
-    if (!editingHive || !swarmFormData.notes.trim()) return;
-
-    const newNote: HiveNote = {
-      id: Crypto.randomUUID(),
-      text: swarmFormData.notes.trim(),
-      createdAt: new Date(),
-    };
-
-    const updatedHive: Hive = {
-      ...editingHive,
-      notes: [...(editingHive.notes || []), newNote],
-      updatedAt: new Date(),
-    };
-
-    if (currentLocation) {
-      const updatedRows = currentLocation.rows.map((row) => ({
-        ...row,
-        hives: row.hives.map((h) => (h.id === editingHive.id ? updatedHive : h)),
-      }));
-
-      updateLocation(currentLocation.id, { rows: updatedRows });
-      setEditingHive(updatedHive);
-      setSwarmFormData({ ...swarmFormData, notes: "" });
-    }
+    setHiveEditForm({ ...hiveEditForm, newNote: "", notes: [...hiveEditForm.notes, newNote] });
   };
 
   const handleDeleteNote = (noteId: string) => {
-    if (!editingHive || !currentLocation) return;
-
-    const updatedHive: Hive = {
-      ...editingHive,
-      notes: (editingHive.notes || []).filter((note) => note.id !== noteId),
-      updatedAt: new Date(),
-    };
-
-    const updatedRows = currentLocation.rows.map((row) => ({
-      ...row,
-      hives: row.hives.map((h) => (h.id === editingHive.id ? updatedHive : h)),
-    }));
-
-    updateLocation(currentLocation.id, { rows: updatedRows });
-    setEditingHive(updatedHive);
+    setHiveEditForm({ ...hiveEditForm, notes: hiveEditForm.notes.filter((n) => n.id !== noteId) });
   };
 
   const handleSaveHive = async () => {
@@ -251,27 +211,32 @@ export default function HivesScreen() {
 
     const updatedHive: Hive = {
       ...editingHive,
-      type: editingHive.type || 'hive',
-      number: parseInt(hiveFormData.hiveNumber) || editingHive.number,
-      health: hiveFormData.health as HiveHealth,
-      hasQueen: hiveFormData.hasQueen,
-      queenId: hiveFormData.queenId || undefined,
-      lastInspection: hiveFormData.lastInspection || undefined,
-      scheduledInspection: hiveFormData.scheduledInspection || undefined,
-      frameCount: parseInt(hiveFormData.frameCount) || 10,
-      isHarvested: hiveFormData.isHarvested,
-      hasPollen: hiveFormData.hasPollen,
-      feedingDates: hiveFormData.feedingDates,
-      lastFeedingDate: hiveFormData.feedingDates.length > 0
-        ? hiveFormData.feedingDates[hiveFormData.feedingDates.length - 1]
+      type: 'hive',
+      number: parseInt(hiveEditForm.hiveNumber) || editingHive.number,
+      health: hiveEditForm.health as HiveHealth,
+      hasQueen: hiveEditForm.hasQueen,
+      queenId: hiveEditForm.queenId || undefined,
+      lastInspection: hiveEditForm.lastInspection || undefined,
+      scheduledInspection: hiveEditForm.scheduledInspection || undefined,
+      frameCount: parseInt(hiveEditForm.frameCount) || 10,
+      isHarvested: hiveEditForm.isHarvested,
+      hasPollen: hiveEditForm.hasPollen,
+      feedingDates: hiveEditForm.feedingDates,
+      lastFeedingDate: hiveEditForm.feedingDates.length > 0
+        ? hiveEditForm.feedingDates[hiveEditForm.feedingDates.length - 1]
         : undefined,
-      harvestDates: hiveFormData.harvestDates,
-      lastHarvestDate: hiveFormData.harvestDates.length > 0
-        ? hiveFormData.harvestDates[hiveFormData.harvestDates.length - 1]
+      harvestDates: hiveEditForm.harvestDates,
+      lastHarvestDate: hiveEditForm.harvestDates.length > 0
+        ? hiveEditForm.harvestDates[hiveEditForm.harvestDates.length - 1]
         : undefined,
+      notes: hiveEditForm.notes,
       updatedAt: new Date(),
-      ...(hiveFormData.isActive !== undefined && {
-        isActive: hiveFormData.isActive,
+      // Hives don't carry swarm-only fields — clear them in case we're
+      // converting from a swarm that had them set.
+      swarmStatus: undefined,
+      swarmStartDate: undefined,
+      ...(hiveEditForm.isActive !== undefined && {
+        isActive: hiveEditForm.isActive,
       }),
     };
 
@@ -287,7 +252,7 @@ export default function HivesScreen() {
 
     setSaving(false);
     setEditHiveModalVisible(false);
-    resetHiveForm();
+    resetHiveEditForm();
   };
 
   const handleAddRow = async () => {
@@ -354,9 +319,9 @@ export default function HivesScreen() {
         : r
     );
 
-    updateLocation(currentLocation.id, { rows: updatedRows });
     setPendingSlotRowId(null);
     setPendingSlotNumber(null);
+    await updateLocation(currentLocation.id, { rows: updatedRows });
   };
 
   const handleRemoveSlot = (rowId: string, hiveId: string, hiveNumber: number, type: HiveType) => {
@@ -380,19 +345,28 @@ export default function HivesScreen() {
     if (!editingHive || !currentLocation) return;
     setSaving(true);
 
-    const existingNotes = editingHive.notes || [];
-    const newNotes = swarmFormData.notes.trim()
-      ? [...existingNotes, { id: Crypto.randomUUID(), text: swarmFormData.notes.trim(), createdAt: new Date() } as HiveNote]
-      : existingNotes;
-
     const updatedHive: Hive = {
       ...editingHive,
-      health: swarmFormData.health,
-      swarmStatus: swarmFormData.swarmStatus,
-      swarmStartDate: swarmFormData.swarmStartDate || undefined,
-      isActive: swarmFormData.isActive,
-      notes: newNotes,
+      type: 'swarm',
+      health: hiveEditForm.health as HiveHealth,
+      swarmStatus: hiveEditForm.swarmStatus,
+      swarmStartDate: hiveEditForm.swarmStartDate || undefined,
+      isActive: hiveEditForm.isActive,
+      scheduledInspection: hiveEditForm.scheduledInspection || undefined,
+      notes: hiveEditForm.notes,
       updatedAt: new Date(),
+      // Swarms don't carry hive-only fields — clear them in case we're
+      // converting from a hive that had them set.
+      hasQueen: undefined,
+      queenId: undefined,
+      frameCount: undefined,
+      isHarvested: undefined,
+      hasPollen: undefined,
+      feedingDates: undefined,
+      harvestDates: undefined,
+      lastFeedingDate: undefined,
+      lastHarvestDate: undefined,
+      lastInspection: undefined,
     };
 
     const updatedRows = currentLocation.rows.map((row) => ({
@@ -403,7 +377,7 @@ export default function HivesScreen() {
     await updateLocation(currentLocation.id, { rows: updatedRows });
     setSaving(false);
     setEditSwarmModalVisible(false);
-    resetSwarmForm();
+    resetHiveEditForm();
     setEditingHive(null);
   };
 
@@ -1112,12 +1086,9 @@ export default function HivesScreen() {
       {/* Edit Hive Modal */}
       <Modal
         visible={editHiveModalVisible}
-        onClose={() => {
-          setEditHiveModalVisible(false);
-          resetHiveForm();
-        }}
+        onClose={closeHiveEditModal}
         title={`Košnica ${editingHive?.number || ""}`}
-        hasUnsavedChanges={hiveFormData.newNote.trim() !== ''}
+        hasUnsavedChanges={isHiveEditFormDirty}
       >
         {/* Type Switcher */}
         <View style={styles.typeSwitcherContainer}>
@@ -1129,41 +1100,15 @@ export default function HivesScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.typeSwitcherOption]}
-            onPress={async () => {
-              if (!editingHive || !currentLocation) return;
-              // Convert hive to swarm
-              const updatedHive: Hive = {
-                ...editingHive,
-                type: 'swarm' as HiveType,
-                swarmStatus: 'empty' as SwarmStatus,
-                hasQueen: undefined,
-                queenId: undefined,
-                frameCount: undefined,
-                isHarvested: undefined,
-                hasPollen: undefined,
-                feedingDates: undefined,
-                harvestDates: undefined,
-                lastFeedingDate: undefined,
-                lastHarvestDate: undefined,
-                lastInspection: undefined,
-                updatedAt: new Date(),
-              };
-              const updatedRows = currentLocation.rows.map((row) => ({
-                ...row,
-                hives: row.hives.map((h) => (h.id === editingHive.id ? updatedHive : h)),
-              }));
-              updateLocation(currentLocation.id, { rows: updatedRows });
+            onPress={() => {
+              if (!editingHive) return;
+              // Switch which form is shown only — nothing is written to the DB
+              // here, and every field stays exactly as-is since hiveEditForm is
+              // shared between both forms. The type conversion (and everything
+              // currently staged) is only persisted when "Sačuvaj" is pressed.
+              // `editingHive` stays untouched so Cancel always discards back to
+              // the real saved state.
               setEditHiveModalVisible(false);
-              resetHiveForm();
-              // Open swarm modal with updated hive
-              setEditingHive(updatedHive);
-              setSwarmFormData({
-                health: updatedHive.health,
-                swarmStatus: 'empty',
-                swarmStartDate: null,
-                notes: "",
-                isActive: updatedHive.isActive !== false,
-              });
               setEditSwarmModalVisible(true);
             }}
           >
@@ -1178,9 +1123,9 @@ export default function HivesScreen() {
 
           <Input
             label="Broj košnice"
-            value={hiveFormData.hiveNumber}
+            value={hiveEditForm.hiveNumber}
             onChangeText={(text) =>
-              setHiveFormData({ ...hiveFormData, hiveNumber: text })
+              setHiveEditForm({ ...hiveEditForm, hiveNumber: text })
             }
             placeholder="Npr. 1, 2, 3..."
             keyboardType="numeric"
@@ -1188,10 +1133,10 @@ export default function HivesScreen() {
 
           <Picker
             label="Zdravlje košnice"
-            value={hiveFormData.health}
+            value={hiveEditForm.health}
             options={healthOptions}
             onValueChange={(value) =>
-              setHiveFormData({ ...hiveFormData, health: value as HiveHealth })
+              setHiveEditForm({ ...hiveEditForm, health: value as HiveHealth })
             }
           />
 
@@ -1200,19 +1145,19 @@ export default function HivesScreen() {
             <TouchableOpacity
               style={[
                 styles.switch,
-                hiveFormData.hasQueen && styles.switchActive,
+                hiveEditForm.hasQueen && styles.switchActive,
               ]}
               onPress={() =>
-                setHiveFormData({
-                  ...hiveFormData,
-                  hasQueen: !hiveFormData.hasQueen,
+                setHiveEditForm({
+                  ...hiveEditForm,
+                  hasQueen: !hiveEditForm.hasQueen,
                 })
               }
             >
               <View
                 style={[
                   styles.switchThumb,
-                  hiveFormData.hasQueen && styles.switchThumbActive,
+                  hiveEditForm.hasQueen && styles.switchThumbActive,
                 ]}
               />
             </TouchableOpacity>
@@ -1220,9 +1165,9 @@ export default function HivesScreen() {
 
           <Input
             label="Broj ramova"
-            value={hiveFormData.frameCount}
+            value={hiveEditForm.frameCount}
             onChangeText={(text) =>
-              setHiveFormData({ ...hiveFormData, frameCount: text })
+              setHiveEditForm({ ...hiveEditForm, frameCount: text })
             }
             placeholder="10"
             keyboardType="numeric"
@@ -1233,14 +1178,14 @@ export default function HivesScreen() {
             <TouchableOpacity
               style={[
                 styles.switch,
-                hiveFormData.isActive && styles.switchActive,
+                hiveEditForm.isActive && styles.switchActive,
               ]}
               onPress={() => {
-                const newIsActive = !hiveFormData.isActive;
+                const newIsActive = !hiveEditForm.isActive;
                 if (newIsActive) {
                   // Reactivating - reset all dates for new colony
-                  setHiveFormData({
-                    ...hiveFormData,
+                  setHiveEditForm({
+                    ...hiveEditForm,
                     isActive: true,
                     health: "good",
                     hasQueen: true,
@@ -1253,8 +1198,8 @@ export default function HivesScreen() {
                   });
                 } else {
                   // Deactivating
-                  setHiveFormData({
-                    ...hiveFormData,
+                  setHiveEditForm({
+                    ...hiveEditForm,
                     isActive: false,
                   });
                 }
@@ -1263,7 +1208,7 @@ export default function HivesScreen() {
               <View
                 style={[
                   styles.switchThumb,
-                  hiveFormData.isActive && styles.switchThumbActive,
+                  hiveEditForm.isActive && styles.switchThumbActive,
                 ]}
               />
             </TouchableOpacity>
@@ -1277,32 +1222,32 @@ export default function HivesScreen() {
           {/* Feeding Dates Section */}
           <View style={styles.feedingSection}>
             <AppText style={styles.feedingLabel}>
-              Prihrane ({hiveFormData.feedingDates.length})
+              Prihrane ({hiveEditForm.feedingDates.length})
             </AppText>
             <DatePicker
               label="Dodaj novu prihranu"
               value={null}
               onChange={(date) => {
                 if (date) {
-                  setHiveFormData({
-                    ...hiveFormData,
-                    feedingDates: [...hiveFormData.feedingDates, date].sort(
+                  setHiveEditForm({
+                    ...hiveEditForm,
+                    feedingDates: [...hiveEditForm.feedingDates, date].sort(
                       (a, b) => b.getTime() - a.getTime()
                     ),
                   });
                 }
               }}
             />
-            {hiveFormData.feedingDates.length > 0 && (
+            {hiveEditForm.feedingDates.length > 0 && (
               <View style={styles.feedingList}>
-                {hiveFormData.feedingDates.map((date, index) => (
+                {hiveEditForm.feedingDates.map((date, index) => (
                   <View key={index} style={styles.feedingItem}>
                     <AppText style={styles.feedingDate}>{formatDate(date)}</AppText>
                     <TouchableOpacity
                       onPress={() => {
-                        setHiveFormData({
-                          ...hiveFormData,
-                          feedingDates: hiveFormData.feedingDates.filter(
+                        setHiveEditForm({
+                          ...hiveEditForm,
+                          feedingDates: hiveEditForm.feedingDates.filter(
                             (_, i) => i !== index
                           ),
                         });
@@ -1319,9 +1264,9 @@ export default function HivesScreen() {
 
           <DatePicker
             label="Datum posljednje inspekcije"
-            value={hiveFormData.lastInspection}
+            value={hiveEditForm.lastInspection}
             onChange={(date) =>
-              setHiveFormData({ ...hiveFormData, lastInspection: date })
+              setHiveEditForm({ ...hiveEditForm, lastInspection: date })
             }
           />
           <View style={styles.scheduledRow}>
@@ -1329,12 +1274,12 @@ export default function HivesScreen() {
               <Ionicons name="calendar" size={16} color="#835500" />
               <AppText style={styles.scheduledLabel}>Zakazana inspekcija</AppText>
             </View>
-            {hiveFormData.scheduledInspection && (
+            {hiveEditForm.scheduledInspection && (
               <View style={styles.scheduledChip}>
                 <AppText style={styles.scheduledChipText}>
-                  {hiveFormData.scheduledInspection.toLocaleDateString("sr-Latn-BA", { day: "2-digit", month: "short", year: "numeric" })}
+                  {hiveEditForm.scheduledInspection.toLocaleDateString("sr-Latn-BA", { day: "2-digit", month: "short", year: "numeric" })}
                 </AppText>
-                <TouchableOpacity onPress={() => setHiveFormData({ ...hiveFormData, scheduledInspection: null })}>
+                <TouchableOpacity onPress={() => setHiveEditForm({ ...hiveEditForm, scheduledInspection: null })}>
                   <Ionicons name="close-circle" size={16} color="#835500" />
                 </TouchableOpacity>
               </View>
@@ -1342,8 +1287,8 @@ export default function HivesScreen() {
           </View>
           <DatePicker
             label="Zakaži inspekciju"
-            value={hiveFormData.scheduledInspection}
-            onChange={(date) => setHiveFormData({ ...hiveFormData, scheduledInspection: date })}
+            value={hiveEditForm.scheduledInspection}
+            onChange={(date) => setHiveEditForm({ ...hiveEditForm, scheduledInspection: date })}
             placeholder="Odaberi datum inspekcije..."
           />
         </View>
@@ -1352,10 +1297,10 @@ export default function HivesScreen() {
         <View style={styles.notesSection}>
           <AppText style={styles.notesLabel}>Bilješke</AppText>
 
-          {/* Existing notes */}
-          {editingHive?.notes && Array.isArray(editingHive.notes) && editingHive.notes.length > 0 && (
+          {/* Staged notes — persisted only when Sačuvaj is pressed */}
+          {hiveEditForm.notes.length > 0 && (
             <View style={styles.notesList}>
-              {editingHive.notes.map((note) => (
+              {hiveEditForm.notes.map((note) => (
                 <View key={note.id} style={styles.noteItem}>
                   <View style={styles.noteContent}>
                     <AppText style={styles.noteText}>{note.text}</AppText>
@@ -1377,9 +1322,9 @@ export default function HivesScreen() {
           {/* Add new note */}
           <View style={styles.addNoteContainer}>
             <Input
-              value={hiveFormData.newNote}
+              value={hiveEditForm.newNote}
               onChangeText={(text) =>
-                setHiveFormData({ ...hiveFormData, newNote: text })
+                setHiveEditForm({ ...hiveEditForm, newNote: text })
               }
               placeholder="Dodaj novu bilješku..."
               multiline
@@ -1389,7 +1334,7 @@ export default function HivesScreen() {
             <Button
               title="Dodaj"
               onPress={handleAddNote}
-              disabled={!hiveFormData.newNote.trim()}
+              disabled={!hiveEditForm.newNote.trim()}
               style={styles.addNoteButton}
             />
           </View>
@@ -1398,10 +1343,7 @@ export default function HivesScreen() {
         <View style={styles.modalButtons}>
           <Button
             title="Otkaži"
-            onPress={() => {
-              setEditHiveModalVisible(false);
-              resetHiveForm();
-            }}
+            onPress={requestCloseHiveEditModal}
             variant="secondary"
             style={{ flex: 1, marginRight: SPACING.sm }}
           />
@@ -1420,7 +1362,7 @@ export default function HivesScreen() {
             const hiveId = editingHive.id;
             const hiveNumber = editingHive.number;
             setEditHiveModalVisible(false);
-            resetHiveForm();
+            resetHiveEditForm();
             handleRemoveSlot(rowId, hiveId, hiveNumber, 'hive');
           }}
         >
@@ -1507,6 +1449,16 @@ export default function HivesScreen() {
           />
         </View>
       </Modal>
+
+      {/* Discard Unsaved Changes Confirmation (hive/swarm edit modal "Otkaži") */}
+      <ConfirmDiscardModal
+        visible={discardConfirmVisible}
+        onCancel={() => setDiscardConfirmVisible(false)}
+        onDiscard={() => {
+          setDiscardConfirmVisible(false);
+          closeHiveEditModal();
+        }}
+      />
 
       {/* Delete Hive/Swarm Confirmation */}
       <ConfirmDeleteModal
@@ -1677,52 +1629,23 @@ export default function HivesScreen() {
       {/* Edit Swarm Modal */}
       <Modal
         visible={editSwarmModalVisible}
-        onClose={() => {
-          setEditSwarmModalVisible(false);
-          resetSwarmForm();
-          setEditingHive(null);
-        }}
+        onClose={closeHiveEditModal}
         title={`Roj ${editingHive?.number || ""}`}
+        hasUnsavedChanges={isHiveEditFormDirty}
       >
         {/* Type Switcher */}
         <View style={styles.typeSwitcherContainer}>
           <TouchableOpacity
             style={[styles.typeSwitcherOption]}
-            onPress={async () => {
-              if (!editingHive || !currentLocation) return;
-              // Convert swarm to hive
-              const updatedHive: Hive = {
-                ...editingHive,
-                type: 'hive' as HiveType,
-                hasQueen: true,
-                frameCount: 10,
-                swarmStatus: undefined,
-                swarmStartDate: undefined,
-                updatedAt: new Date(),
-              };
-              const updatedRows = currentLocation.rows.map((row) => ({
-                ...row,
-                hives: row.hives.map((h) => (h.id === editingHive.id ? updatedHive : h)),
-              }));
-              updateLocation(currentLocation.id, { rows: updatedRows });
+            onPress={() => {
+              if (!editingHive) return;
+              // Switch which form is shown only — nothing is written to the DB
+              // here, and every field stays exactly as-is since hiveEditForm is
+              // shared between both forms. The type conversion (and everything
+              // currently staged) is only persisted when "Sačuvaj" is pressed.
+              // `editingHive` stays untouched so Cancel always discards back to
+              // the real saved state.
               setEditSwarmModalVisible(false);
-              resetSwarmForm();
-              // Open hive modal with updated hive
-              setEditingHive(updatedHive);
-              setHiveFormData({
-                hiveNumber: updatedHive.number.toString(),
-                health: updatedHive.health,
-                hasQueen: true,
-                queenId: "",
-                newNote: "",
-                lastInspection: null,
-                frameCount: "10",
-                isHarvested: false,
-                hasPollen: false,
-                feedingDates: [],
-                harvestDates: [],
-                isActive: updatedHive.isActive !== false,
-              });
               setEditHiveModalVisible(true);
             }}
           >
@@ -1740,19 +1663,19 @@ export default function HivesScreen() {
         <View style={styles.sectionContainer}>
           <Picker
             label="Zdravlje"
-            value={swarmFormData.health}
+            value={hiveEditForm.health}
             options={[
               { label: "Dobro", value: "good" },
               { label: "Upozorenje", value: "warning" },
             ]}
             onValueChange={(value) =>
-              setSwarmFormData({ ...swarmFormData, health: value as HiveHealth })
+              setHiveEditForm({ ...hiveEditForm, health: value as HiveHealth })
             }
           />
 
           <Picker
             label="Status roja"
-            value={swarmFormData.swarmStatus}
+            value={hiveEditForm.swarmStatus}
             options={[
               { label: "Prazan", value: "empty" },
               { label: "Razvija se", value: "developing" },
@@ -1760,27 +1683,27 @@ export default function HivesScreen() {
               { label: "Prirodni", value: "natural" },
             ]}
             onValueChange={(value) =>
-              setSwarmFormData({ ...swarmFormData, swarmStatus: value as SwarmStatus })
+              setHiveEditForm({ ...hiveEditForm, swarmStatus: value as SwarmStatus })
             }
           />
 
           <DatePicker
             label="Datum početka razvoja"
-            value={swarmFormData.swarmStartDate}
+            value={hiveEditForm.swarmStartDate}
             onChange={(date) =>
-              setSwarmFormData({ ...swarmFormData, swarmStartDate: date })
+              setHiveEditForm({ ...hiveEditForm, swarmStartDate: date })
             }
           />
 
           <View style={styles.switchRow}>
             <AppText style={styles.switchLabel}>Aktivan</AppText>
             <TouchableOpacity
-              style={[styles.switch, swarmFormData.isActive && styles.switchActive]}
+              style={[styles.switch, hiveEditForm.isActive && styles.switchActive]}
               onPress={() =>
-                setSwarmFormData({ ...swarmFormData, isActive: !swarmFormData.isActive })
+                setHiveEditForm({ ...hiveEditForm, isActive: !hiveEditForm.isActive })
               }
             >
-              <View style={[styles.switchThumb, swarmFormData.isActive && styles.switchThumbActive]} />
+              <View style={[styles.switchThumb, hiveEditForm.isActive && styles.switchThumbActive]} />
             </TouchableOpacity>
           </View>
 
@@ -1790,10 +1713,10 @@ export default function HivesScreen() {
         <View style={styles.notesSection}>
           <AppText style={styles.notesLabel}>Bilješke</AppText>
 
-          {/* Existing notes */}
-          {editingHive?.notes && editingHive.notes.length > 0 && (
+          {/* Staged notes — persisted only when Sačuvaj is pressed */}
+          {hiveEditForm.notes.length > 0 && (
             <View style={styles.notesList}>
-              {editingHive.notes.map((note) => (
+              {hiveEditForm.notes.map((note) => (
                 <View key={note.id} style={styles.noteItem}>
                   <View style={styles.noteContent}>
                     <AppText style={styles.noteText}>{note.text}</AppText>
@@ -1815,8 +1738,8 @@ export default function HivesScreen() {
           {/* Add new note */}
           <View style={styles.addNoteContainer}>
             <Input
-              value={swarmFormData.notes}
-              onChangeText={(text) => setSwarmFormData({ ...swarmFormData, notes: text })}
+              value={hiveEditForm.newNote}
+              onChangeText={(text) => setHiveEditForm({ ...hiveEditForm, newNote: text })}
               placeholder="Dodaj novu bilješku..."
               multiline
               numberOfLines={3}
@@ -1824,8 +1747,8 @@ export default function HivesScreen() {
             />
             <Button
               title="Dodaj"
-              onPress={handleAddSwarmNote}
-              disabled={!swarmFormData.notes.trim()}
+              onPress={handleAddNote}
+              disabled={!hiveEditForm.newNote.trim()}
               style={styles.addNoteButton}
             />
           </View>
@@ -1834,11 +1757,7 @@ export default function HivesScreen() {
         <View style={styles.modalButtons}>
           <Button
             title="Otkaži"
-            onPress={() => {
-              setEditSwarmModalVisible(false);
-              resetSwarmForm();
-              setEditingHive(null);
-            }}
+            onPress={requestCloseHiveEditModal}
             variant="secondary"
             style={{ flex: 1, marginRight: SPACING.sm }}
           />
@@ -1857,7 +1776,7 @@ export default function HivesScreen() {
             const hiveId = editingHive.id;
             const hiveNumber = editingHive.number;
             setEditSwarmModalVisible(false);
-            resetSwarmForm();
+            resetHiveEditForm();
             setEditingHive(null);
             handleRemoveSlot(rowId, hiveId, hiveNumber, 'swarm');
           }}
@@ -2101,35 +2020,41 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   sectionContainer: {
-    marginBottom: SPACING.xxl,
-    paddingBottom: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderMedium,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderMedium,
   },
   sectionTitle: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: "bold",
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.lg,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#835500",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 1.2,
+    marginBottom: SPACING.md,
+    paddingBottom: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderMedium,
   },
   switchRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: SPACING.md,
-    marginBottom: SPACING.lg,
+    minHeight: 48,
+    paddingVertical: SPACING.xs,
+    marginBottom: SPACING.xs,
   },
   switchLabel: {
     fontSize: FONT_SIZE.md,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
+    fontWeight: "500",
+    color: COLORS.textPrimary,
   },
   switch: {
-    width: 50,
-    height: 28,
-    borderRadius: 14,
+    width: 52,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: COLORS.borderMedium,
     padding: 2,
     justifyContent: "center",
@@ -2138,9 +2063,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   switchThumb: {
-    width: SPACING.xxl,
-    height: SPACING.xxl,
-    borderRadius: SPACING.md,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: COLORS.surface,
     ...SHADOW.sm,
   },
@@ -2148,22 +2073,31 @@ const styles = StyleSheet.create({
     transform: [{ translateX: 22 }],
   },
   notesSection: {
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.lg,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderMedium,
   },
   notesLabel: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#835500",
+    textTransform: "uppercase",
+    letterSpacing: 1.2,
     marginBottom: SPACING.md,
+    paddingBottom: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderMedium,
   },
   notesList: {
     marginBottom: SPACING.md,
   },
   noteItem: {
     flexDirection: "row",
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.md,
     padding: SPACING.md,
     marginBottom: SPACING.sm,
     borderWidth: 1,
@@ -2192,24 +2126,24 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   feedingSection: {
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
   },
   feedingLabel: {
-    fontSize: FONT_SIZE.md,
+    fontSize: FONT_SIZE.sm,
     fontWeight: "600",
     color: COLORS.textSecondary,
     marginBottom: SPACING.sm,
   },
   feedingList: {
-    marginTop: SPACING.md,
+    marginTop: SPACING.sm,
     gap: SPACING.sm,
   },
   feedingItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.md,
     padding: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.borderMedium,

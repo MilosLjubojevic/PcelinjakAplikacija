@@ -266,7 +266,7 @@ export default function HomeScreen() {
         />
         <HeroStat
           icon="trending-up"
-          value={formatCurrencyShort(metrics.totalSalesThisMonth)}
+          value={formatCurrencyShort(metrics.totalIncomeThisMonth)}
           label="PRIHOD"
           chip="ovaj mj."
           iconColor={COLORS.success}

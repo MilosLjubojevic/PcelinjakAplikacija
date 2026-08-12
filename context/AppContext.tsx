@@ -236,16 +236,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
-    const totalSalesThisMonth = state.sales
-      .filter((s) => {
-        const saleDate = new Date(s.saleDate);
-        return (
-          s.status === "completed" &&
-          saleDate.getMonth() === currentMonth &&
-          saleDate.getFullYear() === currentYear
-        );
-      })
+    const isThisMonth = (d: Date) => {
+      const date = new Date(d);
+      return (
+        date.getMonth() === currentMonth && date.getFullYear() === currentYear
+      );
+    };
+    // "Prihod" combines completed sale revenue with manually-recorded income
+    // entries (Finansije screen) — sales alone would always read 0 for users
+    // who only track income via the incomes table.
+    const salesIncomeThisMonth = state.sales
+      .filter((s) => s.status === "completed" && isThisMonth(s.saleDate))
       .reduce((sum, sale) => sum + sale.totalAmount, 0);
+    const recordedIncomeThisMonth = state.incomes
+      .filter((i) => isThisMonth(i.date))
+      .reduce((sum, income) => sum + income.amount, 0);
+    const totalIncomeThisMonth = salesIncomeThisMonth + recordedIncomeThisMonth;
 
     return {
       totalHives,
@@ -255,9 +261,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       totalLocations,
       healthyHives,
       hivesNeedingAttention,
-      totalSalesThisMonth,
+      totalIncomeThisMonth,
     };
-  }, [state.locations, state.queens, state.sales]);
+  }, [state.locations, state.queens, state.sales, state.incomes]);
 
   // Generic local state updater
   const updateState = useCallback((updater: (prev: AppState) => AppState) => {

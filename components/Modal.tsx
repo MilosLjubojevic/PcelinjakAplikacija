@@ -1,4 +1,4 @@
-import React, { ReactNode, useCallback } from 'react';
+import React, { ReactNode, useCallback, useState } from 'react';
 import {
   Modal as RNModal,
   View,
@@ -7,10 +7,10 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
+import ConfirmDiscardModal from './ConfirmDiscardModal';
 import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOW } from '../constants/designTokens';
 
 interface ModalProps {
@@ -31,22 +31,18 @@ export default function Modal({
   showCloseButton = true,
   hasUnsavedChanges = false,
 }: ModalProps) {
+  const [confirmDiscardVisible, setConfirmDiscardVisible] = useState(false);
+
   const handleClose = useCallback(() => {
     if (hasUnsavedChanges) {
-      Alert.alert(
-        'Nesačuvane promjene',
-        'Da li želite da odbacite promjene?',
-        [
-          { text: 'Nastavi sa unosom', style: 'cancel' },
-          { text: 'Odbaci', style: 'destructive', onPress: onClose },
-        ]
-      );
+      setConfirmDiscardVisible(true);
     } else {
       onClose();
     }
   }, [hasUnsavedChanges, onClose]);
 
   return (
+    <>
     <RNModal
       visible={visible}
       animationType="slide"
@@ -78,6 +74,15 @@ export default function Modal({
         </View>
       </KeyboardAvoidingView>
     </RNModal>
+    <ConfirmDiscardModal
+      visible={confirmDiscardVisible}
+      onCancel={() => setConfirmDiscardVisible(false)}
+      onDiscard={() => {
+        setConfirmDiscardVisible(false);
+        onClose();
+      }}
+    />
+    </>
   );
 }
 

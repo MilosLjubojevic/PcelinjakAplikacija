@@ -40,7 +40,7 @@ describe('expenseCategoryOptions', () => {
 
 describe('incomeCategoryOptions', () => {
   it('has matching label/value pairs', () => {
-    expect(incomeCategoryOptions).toHaveLength(6);
+    expect(incomeCategoryOptions).toHaveLength(8);
     incomeCategoryOptions.forEach(opt => {
       expect(opt.label).toBeTruthy();
       expect(opt.value).toBeTruthy();

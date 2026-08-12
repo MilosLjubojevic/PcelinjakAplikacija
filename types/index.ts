@@ -271,7 +271,7 @@ export interface DashboardMetrics {
   totalLocations: number;
   healthyHives: number;
   hivesNeedingAttention: number;
-  totalSalesThisMonth: number;
+  totalIncomeThisMonth: number;
 }
 
 // Allowed email type (Supabase)

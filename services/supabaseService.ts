@@ -218,14 +218,28 @@ async function syncRowHives(
 }
 
 async function syncHiveUpdate(userId: string, oldHive: Hive, newHive: Hive): Promise<void> {
-  // Update hive scalar fields
-  const dbData = hiveToDb(newHive, userId);
-  const { id, user_id, ...updateFields } = dbData;
-  const { error } = await supabase
-    .from('hives')
-    .update({ ...updateFields, updated_at: new Date().toISOString() })
-    .eq('id', newHive.id);
-  if (error) throw error;
+  // Diff-based scalar update: only write columns whose mapped value actually
+  // changed, so a caller that (incorrectly) builds an incomplete `newHive`
+  // can't silently reset untouched fields to hiveToDb's defaults.
+  const dbOld = hiveToDb(oldHive, userId);
+  const dbNew = hiveToDb(newHive, userId);
+  const { id: _oldId, user_id: _oldUserId, ...oldFields } = dbOld;
+  const { id: _newId, user_id: _newUserId, ...newFields } = dbNew;
+
+  const changedFields: Record<string, any> = {};
+  for (const key of Object.keys(newFields) as (keyof typeof newFields)[]) {
+    if (oldFields[key] !== newFields[key]) {
+      changedFields[key] = newFields[key];
+    }
+  }
+
+  if (Object.keys(changedFields).length > 0) {
+    const { error } = await supabase
+      .from('hives')
+      .update({ ...changedFields, updated_at: new Date().toISOString() })
+      .eq('id', newHive.id);
+    if (error) throw error;
+  }
 
   // Sync notes (applies to both hives and swarms)
   const oldNotes = oldHive.notes || [];
